@@ -22,6 +22,37 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend
+  } from 'chart.js';
+  
+  const chartContainerStyle = {
+    minHeight: '32px',
+    width: '96px',
+    position: 'relative' as const,
+    marginLeft: '8px',
+    display: 'inline-block',
+    verticalAlign: 'middle'
+  };
+
+  import { Bar } from 'react-chartjs-2';
+
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend
+  );
+
+
 
 interface MonitoringLog {
   id: string;
@@ -38,6 +69,9 @@ interface MonitoringLog {
   User_Id: string | null;
 }
 
+// Add this type for time filter
+type TimeFilter = '1h' | '12h' | '1d' | '1w';
+
 export default function WebsiteLogs() {
   const { id } = useParams();
   const location = useLocation();
@@ -45,6 +79,9 @@ export default function WebsiteLogs() {
   const [logs, setLogs] = useState<MonitoringLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const websiteName = location.state?.websiteName || "Website";
+
+  // Add these to your component's state
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('1h');
 
   const fetchLogs = async () => {
     setIsLoading(true);
@@ -61,6 +98,132 @@ export default function WebsiteLogs() {
       console.error("Error fetching logs:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+
+  // Add this function to filter logs based on time
+  const getFilteredLogs = () => {
+    const now = new Date();
+    
+    return logs.filter(log => {
+      if (!log.checked_at) return false; // Guard for null checked_at
+      const logDate = new Date(log.checked_at);
+      if (isNaN(logDate.getTime())) return false; // Guard for invalid date string
+
+      const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
+      
+      switch(timeFilter) {
+        case '1h':
+          return diffInHours <= 1;
+        case '12h':
+          return diffInHours <= 12;
+        case '1d': // 1 day
+          return diffInHours <= 24;
+        case '1w': // 1 week
+          return diffInHours <= 24 * 7;
+        default:
+          return diffInHours <= 1; // Fallback to 1 hour
+      }
+    });
+  };
+
+  // Modify your prepareTimelineChartData function
+  const prepareTimelineChartData = () => {
+    const filteredLogs = getFilteredLogs();
+    // Sort logs by checked_at to ensure chronological order for the chart
+    const sortedLogs = [...filteredLogs].sort((a, b) => 
+      new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()
+    );
+    const chartLogs = sortedLogs;
+    
+    return {
+      labels: chartLogs.map(log => new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second: '2-digit' })),
+      datasets: [{
+        label: 'Response Time',
+        data: chartLogs.map(log => log.response_time_ms || 0),
+        backgroundColor: chartLogs.map(log => 
+          log.health_status.toLowerCase() === 'healthy' 
+            ? 'rgba(34, 197, 94, 0.5)' 
+            : 'rgba(239, 68, 68, 0.5)'
+        ),
+        borderColor: chartLogs.map(log => 
+          log.health_status.toLowerCase() === 'healthy'
+            ? 'rgb(34, 197, 94)'
+            : 'rgb(239, 68, 68)'
+        ),
+        borderWidth: 1,
+        borderRadius: 4,
+        // barThickness: 12, // Removed to allow dynamic sizing with scroll
+      }]
+    };
+  };
+
+  // Add these chart options for the timeline
+  const timelineChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        callbacks: {
+          title: (tooltipItems: any) => {
+            const index = tooltipItems[0].dataIndex;
+            const filteredLogs = getFilteredLogs();
+            const sortedLogs = [...filteredLogs]
+              .sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
+            // No slice here, use the full sorted and filtered list
+            const log = sortedLogs[index];
+            if (log && log.checked_at) {
+                return new Date(log.checked_at).toLocaleString();
+            }
+            return ""; 
+          },
+          label: (context: any) => {
+            const index = context.dataIndex;
+            const filteredLogs = getFilteredLogs();
+            const sortedLogs = [...filteredLogs]
+              .sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
+            // No slice here
+            const log = sortedLogs[index];
+            if (log) {
+                return [
+                  `Response Time: ${context.raw}ms`,
+                  `Status: ${log.health_status}`,
+                  `Status Code: ${log.status_code || 'N/A'}`
+                ];
+            }
+            return [];
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)',
+        },
+        ticks: {
+          callback: (value: number) => `${value}ms`
+        },
+        border: {
+          display: false
+        }
+      },
+      x: {
+        grid: {
+          display: false
+        },
+        ticks: {
+          display: false
+        },
+        border: {
+          display: false
+        }
+      }
     }
   };
 
@@ -142,6 +305,12 @@ export default function WebsiteLogs() {
     return "bg-red-100 text-red-700";
   };
 
+  // Prepare chart data and related constants once before return
+  const chartData = prepareTimelineChartData();
+  const numDataPoints = chartData.datasets[0]?.data?.length || 0;
+  const chartMinWidth = Math.max(300, numDataPoints * 20); // 20px per bar, min 300px width
+  const noDataForSelectedRange = numDataPoints === 0;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -188,7 +357,65 @@ export default function WebsiteLogs() {
             <CardTitle>Monitoring History</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-300px)]">
+            {/* Add this new section for the response time chart */}
+            <div className="mb-6">
+              <div className="p-4 rounded-lg border bg-card">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-medium">Response Time Timeline</h3>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={timeFilter === '1h' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTimeFilter('1h')}
+                      className="h-7 text-xs"
+                    >
+                      Last Hour
+                    </Button>
+                    <Button
+                      variant={timeFilter === '12h' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTimeFilter('12h')}
+                      className="h-7 text-xs"
+                    >
+                      12 Hours
+                    </Button>
+                    <Button
+                      variant={timeFilter === '1d' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTimeFilter('1d')}
+                      className="h-7 text-xs"
+                    >
+                      1 Day
+                    </Button>
+                    <Button
+                      variant={timeFilter === '1w' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTimeFilter('1w')}
+                      className="h-7 text-xs"
+                    >
+                      1 Week
+                    </Button>
+                  </div>
+                </div>
+                {/* MODIFIED: Chart container with horizontal scroll */}
+                <div style={{ overflowX: 'auto', width: '100%', height: '140px' }}>
+                  <div style={{ height: '120px', minWidth: `${chartMinWidth}px` }}>
+                    <Bar
+                      data={chartData} // Use pre-calculated chartData
+                      options={timelineChartOptions}
+                    />
+                  </div>
+                </div>
+                {/* Add a message when no data is available for the selected time range */}
+                {noDataForSelectedRange && ( // Use pre-calculated boolean
+                  <div className="text-center py-2 text-muted-foreground text-sm">
+                    No data available for the selected time range
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <ScrollArea className="h-[calc(100vh-420px)]"> {/* Adjusted height to accommodate chart */}
               <div className="space-y-4">
                 {logs.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
