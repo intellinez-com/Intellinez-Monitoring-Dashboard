@@ -34,7 +34,7 @@ const Index = () => {
           website:websites!inner(website_name,is_active)
         `)
         .gte('checked_at', oneHourAgo.toISOString())
-        .eq('websites.is_active',true)
+        .eq('websites.is_active', true)
         .order('checked_at', { ascending: true });
 
       if (error) throw error;
@@ -95,11 +95,21 @@ const Index = () => {
       if (stored) websiteColorMap = JSON.parse(stored);
     } catch { }
 
-    // Helper to generate a unique color not already used
+    // Helper to check if a color is "dangerous" (red-ish)
+    const isDangerColor = (hex: string) => {
+      // Convert hex to RGB
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      // Heuristic: red is dominant and not much green/blue
+      return r > 180 && g < 100 && b < 100;
+    };
+
+    // Helper to generate a unique color not already used and not "danger"
     const generateUniqueColor = (usedColors: string[]): string => {
       let color = "";
       let attempts = 0;
-      const maxAttempts = 100;
+      const maxAttempts = 200;
       while (attempts < maxAttempts) {
         const hue = Math.floor(Math.random() * 360);
         const saturation = 70;
@@ -122,9 +132,14 @@ const Index = () => {
           return hex.length === 1 ? '0' + hex : hex;
         };
         color = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-        if (!usedColors.includes(color)) break;
+        if (
+          !usedColors.includes(color) &&
+          !isDangerColor(color)
+        ) break;
         attempts++;
       }
+      // Fallback: if all else fails, pick a safe blue
+      if (isDangerColor(color)) color = "#3498db";
       return color;
     };
 
