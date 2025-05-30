@@ -100,7 +100,7 @@ const handleLogout = async () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Navigation</DropdownMenuLabel>
+            {/* <DropdownMenuLabel>Navigation</DropdownMenuLabel> */}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link to="/">Dashboard</Link>
@@ -111,19 +111,19 @@ const handleLogout = async () => {
             <DropdownMenuItem asChild>
               <Link to="/servers">Servers</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
+            {/* <DropdownMenuItem asChild>
               <Link to="/databases">Databases</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
+            </DropdownMenuItem> */}
+            <DropdownMenuItem asChild >
               <Link to="/metrics">Metrics</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
+            {/* <DropdownMenuItem asChild>
               <Link to="/alerts">Alerts</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLogout}>Log out</DropdownMenuItem>
+            <DropdownMenuItem>Settings</DropdownMenuItem> */}
+            <DropdownMenuItem onClick={handleLogout} className="bg-primary/10" >Log out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

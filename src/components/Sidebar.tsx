@@ -13,9 +13,9 @@ export function Sidebar() {
     { name: "Dashboard", href: "/", icon: Home },
     { name: "Websites", href: "/websites", icon: Monitor },
     { name: "Servers", href: "/servers", icon: Server },
-    { name: "Databases", href: "/databases", icon: Database },
+    // { name: "Databases", href: "/databases", icon: Database },
     { name: "Metrics", href: "/metrics", icon: BarChart },
-    { name: "Alerts", href: "/alerts", icon: Bell },
+    // { name: "Alerts", href: "/alerts", icon: Bell },
   ];
 
 

@@ -3,24 +3,25 @@ import { useWebsiteStatus } from "@/contexts/WebsiteStatusContext";
 
 export function StatusOverview() {
   const { counts } = useWebsiteStatus();
+  console.log(counts);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <StatsCard 
+      <StatsCard
         title="Total Resources"
         value={counts.all}
       />
-      <StatsCard 
+      <StatsCard
         title="Healthy"
         value={counts.healthy}
         icon="healthy"
       />
-      <StatsCard 
+      <StatsCard
         title="Warning"
         value={counts.degraded}
         icon="warning"
       />
-      <StatsCard 
+      <StatsCard
         title="Critical"
         value={counts.offline}
         icon="critical"
