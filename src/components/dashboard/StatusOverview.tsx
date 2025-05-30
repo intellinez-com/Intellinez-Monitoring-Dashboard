@@ -1,29 +1,28 @@
+import { useWebsiteHealthCounts } from "@/hooks/useWebsiteStatus";
 import { StatsCard } from "./StatsCard";
-import { useWebsiteStatus } from "@/contexts/WebsiteStatusContext";
 
 export function StatusOverview() {
-  const { counts } = useWebsiteStatus();
-  console.log(counts);
-
+  const { data } = useWebsiteHealthCounts();
+  
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <StatsCard
-        title="Total Resources"
-        value={counts.all}
+        title="Total Websites"
+        value={data.all}
       />
       <StatsCard
         title="Healthy"
-        value={counts.healthy}
+        value={data.healthy}
         icon="healthy"
       />
       <StatsCard
-        title="Warning"
-        value={counts.degraded}
+        title="Degraded"
+        value={data.degraded}
         icon="warning"
       />
       <StatsCard
-        title="Critical"
-        value={counts.offline}
+        title="Offline"
+        value={data.offline}
         icon="critical"
       />
     </div>
