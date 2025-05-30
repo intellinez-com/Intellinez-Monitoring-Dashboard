@@ -3,7 +3,6 @@ import { StatusOverview } from "@/components/dashboard/StatusOverview";
 import { MetricsChart } from "@/components/dashboard/MetricsChart";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Website } from "@/types/website";
 
 interface MonitoringLog {
   website_id: string;
@@ -18,6 +17,8 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [monitoringData, setMonitoringData] = useState<MonitoringLog[]>([]);
 
+
+
   const fetchMonitoringData = async () => {
     try {
       // Calculate timestamp for 1 hour ago
@@ -30,10 +31,10 @@ const Index = () => {
           website_id,
           response_time_ms,
           checked_at,
-          website:websites!inner(website_name, is_active)
+          website:websites!inner(website_name,is_active)
         `)
         .gte('checked_at', oneHourAgo.toISOString())
-        .eq('website.is_active',true)
+        .eq('websites.is_active',true)
         .order('checked_at', { ascending: true });
 
       if (error) throw error;
@@ -173,7 +174,6 @@ const Index = () => {
         </div>
 
         <StatusOverview />
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-3">
             <MetricsChart

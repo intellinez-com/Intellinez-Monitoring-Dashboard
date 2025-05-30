@@ -1,34 +1,62 @@
-// hooks/useWebsiteStatus.ts
-import { useState } from "react";
+// src/hooks/useWebsiteHealthCounts.ts
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Website } from "@/types/website";
 
-export function useWebsiteStatus() {
-  const [loading, setLoading] = useState(false);
+type HealthCounts = {
+  healthy: number;
+  degraded: number;
+  offline: number;
+  all: number;
+};
+
+export const useWebsiteHealthCounts = () => {
+  const [data, setData] = useState<HealthCounts>({
+    healthy: 0,
+    degraded: 0,
+    offline: 0,
+    all: 0,
+  });
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshWebsite = async (id: string): Promise<Website | null> => {
-    setLoading(true);
-    setError(null);
+  const fetchCounts = async () => {
+    const { data: countsData, error } = await supabase.rpc("get_health_status_counts");
 
-    try {
-      const { data, error } = await supabase
-        .from("websites")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-
-      return data as Website;
-    } catch (err: any) {
-      console.error("Error refreshing website:", err.message);
-      setError("Failed to refresh website");
-      return null;
-    } finally {
+    if (error) {
+      setError(error.message);
       setLoading(false);
+      return;
     }
+
+    let total = 0;
+    const counts: HealthCounts = {
+      healthy: 0,
+      degraded: 0,
+      offline: 0,
+      all: 0,
+    };
+
+    countsData.forEach((item: any) => {
+      const key = item.health_status?.toLowerCase();
+      if (key && key in counts) {
+        counts[key as keyof HealthCounts] = item.count;
+        total += item.count;
+      }
+    });
+
+    counts.all = total;
+
+    setData(counts);
+    setLoading(false);
   };
 
-  return { refreshWebsite, loading, error };
-}
+  useEffect(() => {
+    fetchCounts(); // Run on mount
+
+    const interval = setInterval(fetchCounts, 40000); // 🕐 Every 40 seconds
+
+    return () => clearInterval(interval); // 💣 Clean up on unmount
+  }, []);
+
+  return { data, loading, error };
+};

@@ -17,7 +17,6 @@ import { WebsiteStatusCard } from "./WebsiteStatusCard";
 import { WebsiteStatusFilter } from "./WebsiteStatusFilter";
 import { WebsiteCardSkeleton } from "./WebsiteCardSkeleton";
 import { Search } from "lucide-react";
-import { useWebsiteStatus } from "@/contexts/WebsiteStatusContext";
 
 export function WebsiteManager() {
   const [websites, setWebsites] = useState<WebsiteWithSSL[]>([]);
@@ -42,7 +41,6 @@ export function WebsiteManager() {
     const stored = localStorage.getItem("is_Monitoring");
     return stored ? JSON.parse(stored) : false;
   });
-  const { setCounts } = useWebsiteStatus();
 
   useEffect(() => {
     // Update localStorage whenever is_Monitoring changes
@@ -392,15 +390,8 @@ export function WebsiteManager() {
         }
         return prev;
       });
-  
+
       setLastUpdated(new Date());
-      setCounts({
-        all: freshData.length,
-        healthy: freshData.filter(w => w.health_status === "healthy").length,
-        degraded: freshData.filter(w => w.health_status === "warning").length,
-        offline: freshData.filter(w => w.health_status === "critical").length,
-      });
-  
       setTimeout(() => setIsLoading(false), 200);
     }
   };
@@ -415,7 +406,7 @@ export function WebsiteManager() {
 
     const intervalId = setInterval(() => {
       fetchWebsites();
-    }, 55000);
+    }, 35000);
 
     return () => clearInterval(intervalId);
   }, [userId, is_Monitoring]);
