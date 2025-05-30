@@ -1,20 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  ArrowLeft, 
-  RefreshCw, 
-  Clock, 
-  Activity, 
-  AlertTriangle, 
-  CheckCircle2, 
+import {
+  ArrowLeft,
+  RefreshCw,
+  Clock,
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
   XCircle,
   Download,
   Timer,
   Hash,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
@@ -23,43 +25,50 @@ import { formatDistanceToNow } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    Title,
-    Tooltip,
-    Legend
-  } from 'chart.js';
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  LineController,
+  ChartData
+} from 'chart.js';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-  } from "@/components/ui/select";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-  
-  const chartContainerStyle = {
-    minHeight: '32px',
-    width: '96px',
-    position: 'relative' as const,
-    marginLeft: '8px',
-    display: 'inline-block',
-    verticalAlign: 'middle'
-  };
 
-  import { Bar } from 'react-chartjs-2';
+const chartContainerStyle = {
+  minHeight: '32px',
+  width: '96px',
+  position: 'relative' as const,
+  marginLeft: '8px',
+  display: 'inline-block',
+  verticalAlign: 'middle'
+};
 
-  ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    Title,
-    Tooltip,
-    Legend
-  );
+import { Bar, Chart } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  LineController
+);
 
 
 
@@ -79,7 +88,9 @@ interface MonitoringLog {
 }
 
 // Add this type for time filter
-type TimeFilter = '1h' | '12h' | '1d' | '1w';
+// type TimeFilter = '1h' | '12h' | '1d' | '1w';
+type ChartTimeFilterType = '1h' | '12h' | '1d' | '1w';
+type LogTimeFilterType = '1h' | '6h' | '1d' | '1w';
 
 export default function WebsiteLogs() {
   const { id } = useParams();
@@ -90,7 +101,9 @@ export default function WebsiteLogs() {
   const websiteName = location.state?.websiteName || "Website";
 
   // Add these to your component's state
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('1h');
+  // const [timeFilter, setTimeFilter] = useState<TimeFilter>('1h');
+  const [chartTimeFilter, setChartTimeFilter] = useState<ChartTimeFilterType>('1h');
+  const [logTimeFilter, setLogTimeFilter] = useState<LogTimeFilterType>('1h');
   const [showChartUnhappyOnly, setShowChartUnhappyOnly] = useState<boolean>(false);
 
   // New state variables for advanced filters
@@ -100,8 +113,12 @@ export default function WebsiteLogs() {
   // State for populating filter dropdowns
   const [uniqueHealthStatuses, setUniqueHealthStatuses] = useState<string[]>([]);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(20);
+
   // New function to filter logs specifically for the timeline chart (time-based only)
-  const getTimelineChartFilteredLogs = () => {
+  const getTimelineChartFilteredLogs = useCallback(() => {
     const now = new Date();
     let chartLogs = logs.filter(log => {
       if (!log.checked_at) return false;
@@ -109,28 +126,26 @@ export default function WebsiteLogs() {
       if (isNaN(logDate.getTime())) return false;
 
       const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
-      
-      switch(timeFilter) {
+
+      switch (chartTimeFilter) {
         case '1h':
           return diffInHours <= 1;
         case '12h':
           return diffInHours <= 12;
-        case '1d': 
+        case '1d':
           return diffInHours <= 24;
-        case '1w': 
+        case '1w':
           return diffInHours <= 24 * 7;
         default:
-          return diffInHours <= 1; 
+          return diffInHours <= 1;
       }
     });
 
-    // Apply the new chart-specific filter for unhappy logs (non-healthy status)
     if (showChartUnhappyOnly) {
       chartLogs = chartLogs.filter(log => log.health_status.toLowerCase() !== 'healthy');
     }
-
     return chartLogs;
-  };
+  }, [logs, chartTimeFilter, showChartUnhappyOnly]);
 
   const fetchLogs = async () => {
     setIsLoading(true);
@@ -143,11 +158,13 @@ export default function WebsiteLogs() {
 
       if (error) throw error;
       setLogs(data || []);
+      // Reset to first page when new data is fetched
+      setCurrentPage(1);
       // Populate unique filter options after fetching logs
       if (data) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
         const statusesFromLogs = Array.from(new Set(data.map(log => log.health_status))).sort();
-        const combinedStatuses = Array.from(new Set(["all", ...predefinedStatuses, ...statusesFromLogs])).sort((a,b) => {
+        const combinedStatuses = Array.from(new Set(["all", ...predefinedStatuses, ...statusesFromLogs])).sort((a, b) => {
           if (a === "all") return -1;
           if (b === "all") return 1;
           return a.localeCompare(b);
@@ -165,25 +182,25 @@ export default function WebsiteLogs() {
   // Add this function to filter logs based on time
   const getFilteredLogs = () => {
     const now = new Date();
-    
+
     let filtered = logs.filter(log => {
-      if (!log.checked_at) return false; 
+      if (!log.checked_at) return false;
       const logDate = new Date(log.checked_at);
-      if (isNaN(logDate.getTime())) return false; 
+      if (isNaN(logDate.getTime())) return false;
 
       const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
-      
-      switch(timeFilter) {
+
+      switch (logTimeFilter) {
         case '1h':
           return diffInHours <= 1;
-        case '12h':
-          return diffInHours <= 12;
-        case '1d': 
+        case '6h':
+          return diffInHours <= 6;
+        case '1d':
           return diffInHours <= 24;
-        case '1w': 
+        case '1w':
           return diffInHours <= 24 * 7;
         default:
-          return diffInHours <= 1; 
+          return diffInHours <= 1;
       }
     });
 
@@ -200,38 +217,99 @@ export default function WebsiteLogs() {
     return filtered;
   };
 
+  // Get paginated logs
+  const getPaginatedLogs = () => {
+    const filtered = getFilteredLogs();
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return {
+      logs: filtered.slice(startIndex, endIndex),
+      totalCount: filtered.length,
+      totalPages: Math.ceil(filtered.length / itemsPerPage),
+      hasNext: endIndex < filtered.length,
+      hasPrev: currentPage > 1
+    };
+  };
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [logTimeFilter, selectedHealthStatus, showErrorsOnly]);
+
   // Modify your prepareTimelineChartData function
-  const prepareTimelineChartData = () => {
-    const filteredLogs = getTimelineChartFilteredLogs(); // Use the new chart-specific filter
-    // Sort logs by checked_at to ensure chronological order for the chart
-    const sortedLogs = [...filteredLogs].sort((a, b) => 
+  const prepareTimelineChartData = useCallback((currentChartTimeFilter: ChartTimeFilterType): ChartData<'bar' | 'line', number[], string> => {
+    const filteredLogs = getTimelineChartFilteredLogs();
+    const sortedLogs = [...filteredLogs].sort((a, b) =>
       new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()
     );
     const chartLogs = sortedLogs;
-    
+
+    let barThicknessValue = 8;
+    if (currentChartTimeFilter === '12h') barThicknessValue = 6;
+    else if (currentChartTimeFilter === '1d') barThicknessValue = 4;
+    else if (currentChartTimeFilter === '1w') barThicknessValue = 2;
+
+    const responseTimes = chartLogs.map(log => log.response_time_ms || 0);
+    const maxResponseTimeInView = responseTimes.length > 0 ? Math.max(...responseTimes) : 0;
+    const baseOffset = Math.max(maxResponseTimeInView * 0.25, 20);
+    const dynamicLineData = responseTimes.map(rt => rt + maxResponseTimeInView * 0.3 + baseOffset);
+
     return {
-      labels: chartLogs.map(log => new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second: '2-digit' })),
+      labels: chartLogs.map(log => new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })),
       datasets: [{
-        label: 'Response Time',
-        data: chartLogs.map(log => log.response_time_ms || 0),
-        backgroundColor: chartLogs.map(log => 
-          log.health_status.toLowerCase() === 'healthy' 
-            ? 'rgb(34, 197, 94)'  // Solid green
-            : 'rgb(239, 68, 68)' // Solid red
+        label: 'Response Time (Bars)',
+        data: responseTimes,
+        backgroundColor: chartLogs.map(log =>
+          log.health_status.toLowerCase() === 'healthy'
+            ? 'rgb(34, 197, 94)'
+            : 'rgb(239, 68, 68)'
         ),
-        borderColor: chartLogs.map(log => 
+        borderColor: chartLogs.map(log =>
           log.health_status.toLowerCase() === 'healthy'
             ? 'rgb(34, 197, 94)'
             : 'rgb(239, 68, 68)'
         ),
         borderWidth: 1,
         borderRadius: 4,
-        // barThickness: 12, // Removed to allow dynamic sizing with scroll
+        barThickness: barThicknessValue,
+        order: 2
+      },
+      {
+        type: 'line' as const,
+        label: 'Trend Line',
+        data: dynamicLineData,
+        borderColor: 'rgb(100, 100, 100)',
+        borderWidth: 2.5,
+        pointBackgroundColor: chartLogs.map(log =>
+          log.health_status.toLowerCase() !== 'healthy'
+            ? 'rgb(255, 0, 0)'
+            : 'transparent'
+        ),
+        pointBorderColor: chartLogs.map(log =>
+          log.health_status.toLowerCase() !== 'healthy'
+            ? 'rgb(255,0,0)'
+            : 'transparent'
+        ),
+        pointRadius: chartLogs.map(log =>
+          log.health_status.toLowerCase() !== 'healthy'
+            ? 5
+            : 0
+        ),
+        pointHoverRadius: chartLogs.map(log =>
+          log.health_status.toLowerCase() !== 'healthy'
+            ? 7
+            : 0
+        ),
+        fill: false,
+        tension: 0.3,
+        order: 1
       }]
     };
-  };
+  }, [getTimelineChartFilteredLogs]);
 
-  // Add these chart options for the timeline
+  const chartData = useMemo(() => prepareTimelineChartData(chartTimeFilter), [chartTimeFilter, prepareTimelineChartData]);
+
+  // Moved timelineChartOptions definition here, immediately before the return statement
   const timelineChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -243,27 +321,25 @@ export default function WebsiteLogs() {
         callbacks: {
           title: (tooltipItems: any) => {
             const index = tooltipItems[0].dataIndex;
-            const filteredLogs = getTimelineChartFilteredLogs(); // Use the new chart-specific filter for tooltips
-            const sortedLogs = [...filteredLogs]
-              .sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
+            const logsForTooltip = getTimelineChartFilteredLogs();
+            const sortedLogs = [...logsForTooltip].sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
             const log = sortedLogs[index];
             if (log && log.checked_at) {
-                return new Date(log.checked_at).toLocaleString();
+              return new Date(log.checked_at).toLocaleString();
             }
-            return ""; 
+            return "";
           },
           label: (context: any) => {
             const index = context.dataIndex;
-            const filteredLogs = getTimelineChartFilteredLogs(); // Use the new chart-specific filter for tooltips
-            const sortedLogs = [...filteredLogs]
-              .sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
+            const logsForTooltip = getTimelineChartFilteredLogs();
+            const sortedLogs = [...logsForTooltip].sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
             const log = sortedLogs[index];
             if (log) {
-                return [
-                  `Response Time: ${context.raw}ms`,
-                  `Status: ${log.health_status}`,
-                  `Status Code: ${log.status_code || 'N/A'}`
-                ];
+              return [
+                `Response Time: ${log.response_time_ms || 0}ms`,
+                `Status: ${log.health_status}`,
+                `Status Code: ${log.status_code || 'N/A'}`
+              ];
             }
             return [];
           }
@@ -297,6 +373,8 @@ export default function WebsiteLogs() {
     }
   };
 
+  const noDataForChart = getTimelineChartFilteredLogs().length === 0;
+
   useEffect(() => {
     fetchLogs();
   }, [id]);
@@ -323,9 +401,9 @@ export default function WebsiteLogs() {
 
     const csvContent = [
       headers.join(","),
-      ...csvData.map(row => row.map(cell => 
-        typeof cell === 'string' && cell.includes(",") 
-          ? `"${cell}"` 
+      ...csvData.map(row => row.map(cell =>
+        typeof cell === 'string' && cell.includes(",")
+          ? `"${cell}"`
           : cell
       ).join(","))
     ].join("\n");
@@ -374,11 +452,6 @@ export default function WebsiteLogs() {
     if (code >= 400 && code < 500) return "bg-yellow-100 text-yellow-700";
     return "bg-red-100 text-red-700";
   };
-
-  // Prepare chart data once before return
-  const chartData = prepareTimelineChartData();
-  // The "noDataForSelectedRange" for the chart should also use the chart-specific filter
-  const noDataForChart = getTimelineChartFilteredLogs().length === 0;
 
   return (
     <DashboardLayout>
@@ -434,43 +507,43 @@ export default function WebsiteLogs() {
                   <div className="flex gap-2 flex-wrap items-center">
                     {/* Time Period Filters */}
                     <Button
-                      variant={timeFilter === '1h' ? 'default' : 'outline'}
+                      variant={chartTimeFilter === '1h' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setTimeFilter('1h')}
+                      onClick={() => setChartTimeFilter('1h')}
                       className="h-7 text-xs"
                     >
                       Last Hour
                     </Button>
                     <Button
-                      variant={timeFilter === '12h' ? 'default' : 'outline'}
+                      variant={chartTimeFilter === '12h' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setTimeFilter('12h')}
+                      onClick={() => setChartTimeFilter('12h')}
                       className="h-7 text-xs"
                     >
                       12 Hours
                     </Button>
                     <Button
-                      variant={timeFilter === '1d' ? 'default' : 'outline'}
+                      variant={chartTimeFilter === '1d' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setTimeFilter('1d')}
+                      onClick={() => setChartTimeFilter('1d')}
                       className="h-7 text-xs"
                     >
                       1 Day
                     </Button>
                     <Button
-                      variant={timeFilter === '1w' ? 'default' : 'outline'}
+                      variant={chartTimeFilter === '1w' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setTimeFilter('1w')}
+                      onClick={() => setChartTimeFilter('1w')}
                       className="h-7 text-xs"
                     >
                       1 Week
                     </Button>
                     {/* New Switch for chart: Show Unhappy Only */}
                     <div className="flex items-center space-x-2 pl-2">
-                      <Switch 
-                        id="showChartUnhappyOnly" 
-                        checked={showChartUnhappyOnly} 
-                        onCheckedChange={setShowChartUnhappyOnly} 
+                      <Switch
+                        id="showChartUnhappyOnly"
+                        checked={showChartUnhappyOnly}
+                        onCheckedChange={setShowChartUnhappyOnly}
                       />
                       <Label htmlFor="showChartUnhappyOnly" className="text-xs text-muted-foreground">
                         Show Errors Only
@@ -480,13 +553,14 @@ export default function WebsiteLogs() {
                 </div>
                 {/* MODIFIED: Chart container to fit available width */}
                 <div className="h-[120px] w-full">
-                  <Bar
-                    data={chartData} // Use pre-calculated chartData
+                  <Chart
+                    type='bar'
+                    data={chartData}
                     options={timelineChartOptions}
                   />
                 </div>
                 {/* Add a message when no data is available for the selected time range */}
-                {noDataForChart && ( // Use chart-specific boolean
+                {noDataForChart && (
                   <div className="text-center py-2 text-muted-foreground text-sm">
                     No data available for the selected time range
                   </div>
@@ -496,7 +570,7 @@ export default function WebsiteLogs() {
 
             {/* New Advanced Filters Section */}
             <div className="px-1 py-4 border-t border-b">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
                 {/* Health Status Filter */}
                 <div className="sm:col-span-1">
                   <Label htmlFor="healthStatusFilter" className="text-xs font-medium text-muted-foreground">Filter by Health Status</Label>
@@ -513,13 +587,26 @@ export default function WebsiteLogs() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="sm:col-span-1">
+                  <Label htmlFor="logTimeFilter" className="text-xs font-medium text-muted-foreground">Filter Logs by Time</Label>
+                  <Select value={logTimeFilter} onValueChange={(value) => setLogTimeFilter(value as LogTimeFilterType)}>
+                    <SelectTrigger id="logTimeFilter" className="h-9 mt-1">
+                      <SelectValue placeholder="Select time range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1h">Last Hour</SelectItem>
+                      <SelectItem value="6h">Last 6 Hours</SelectItem>
+                      <SelectItem value="1d">Last Day</SelectItem>
+                      <SelectItem value="1w">Last Week</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                {/* Show Errors Only Filter */}
                 <div className="flex items-center space-x-2 justify-self-start sm:col-span-1">
-                  <Switch 
-                    id="showErrorsOnly" 
-                    checked={showErrorsOnly} 
-                    onCheckedChange={setShowErrorsOnly} 
+                  <Switch
+                    id="showErrorsOnly"
+                    checked={showErrorsOnly}
+                    onCheckedChange={setShowErrorsOnly}
                   />
                   <Label htmlFor="showErrorsOnly" className="text-sm">
                     Show Errors Only
@@ -528,88 +615,122 @@ export default function WebsiteLogs() {
               </div>
             </div>
 
-            <ScrollArea className="h-[calc(100vh-500px)]"> {/* Adjusted height to accommodate filters */}
-              <div className="space-y-4 pt-4">
-                {getFilteredLogs().length === 0 ? ( // Use getFilteredLogs() here to reflect all filters
-                  <div className="text-center py-8 text-muted-foreground">
-                    No monitoring logs found
-                  </div>
-                ) : (
-                  getFilteredLogs().map((log) => (
-                    <div
-                      key={log.id}
-                      className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-sm"
-                    >
-                      <div className="flex flex-wrap items-center gap-x-10 gap-y-1">
-                        {/* Timestamp (Short) */}
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="font-medium">Time:</span>
-                          <span className="text-muted-foreground">
-                            {new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}
-                          </span>
-                          <span className="text-muted-foreground hidden md:inline">
-                             - {new Date(log.checked_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </span>
-                        </div>
 
-                        {/* Health Status & Code */}
-                        <div className="flex items-center gap-4 whitespace-nowrap">
-                          {getHealthStatusIcon(log.health_status)} 
-                          <span className="font-medium">Health Status:</span>
-                          <span 
-                            className={cn(
-                              log.health_status.toLowerCase() === 'healthy' ? "text-emerald-600" :
+            <div className="space-y-4 pt-4">
+              {getPaginatedLogs().logs.length === 0 ? ( // Use getPaginatedLogs() here to reflect all filters
+                <div className="text-center py-8 text-muted-foreground">
+                  No monitoring logs found
+                </div>
+              ) : (
+                getPaginatedLogs().logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-sm"
+                  >
+                    <div className="flex flex-wrap items-center gap-x-10 gap-y-1">
+                      {/* Timestamp (Short) */}
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-medium">Time:</span>
+                        <span className="text-muted-foreground">
+                          {new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-muted-foreground hidden md:inline">
+                          - {new Date(log.checked_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+
+                      {/* Health Status & Code */}
+                      <div className="flex items-center gap-4 whitespace-nowrap">
+                        {getHealthStatusIcon(log.health_status)}
+                        <span className="font-medium">Health Status:</span>
+                        <span
+                          className={cn(
+                            log.health_status.toLowerCase() === 'healthy' ? "text-emerald-600" :
                               log.health_status.toLowerCase() === 'degraded' ? "text-yellow-600" :
-                              log.health_status.toLowerCase() === 'offline' ? "text-red-600" : "text-gray-600"
-                            )}
-                          >
-                            {log.health_status}
-                          </span>
-                          {log.status_code && (
-                            <>
-                              <span className="font-medium ml-1">Status Code:</span>
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "font-mono text-xs h-5 px-1.5",
-                                  getStatusCodeColor(log.status_code)
-                                )}
-                              >
-                                {log.status_code}
-                              </Badge>
-                            </>
+                                log.health_status.toLowerCase() === 'offline' ? "text-red-600" : "text-gray-600"
                           )}
-                        </div>
-                        
-                        {/* Response Time */}
-                        {log.response_time_ms !== null && (
-                           <div className="flex items-center gap-1 whitespace-nowrap">
-                            <Timer className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="font-medium">Response time:</span>
-                            <span className="text-muted-foreground font-mono">{log.response_time_ms}ms</span>
-                          </div>
-                        )}
-
-                        {/* Error Indicator (only if error exists) */}
-                        {log.error_message && (
-                          <div className="flex items-center gap-1 text-red-500 whitespace-nowrap">
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            <span className="font-medium">Error</span>
-                          </div>
+                        >
+                          {log.health_status}
+                        </span>
+                        {log.status_code && (
+                          <>
+                            <span className="font-medium ml-1">Status Code:</span>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "font-mono text-xs h-5 px-1.5",
+                                getStatusCodeColor(log.status_code)
+                              )}
+                            >
+                              {log.status_code}
+                            </Badge>
+                          </>
                         )}
                       </div>
-                      {/* Error Message Section (if exists, on new line) */}
+
+                      {/* Response Time */}
+                      {log.response_time_ms !== null && (
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="font-medium">Response time:</span>
+                          <span className="text-muted-foreground font-mono">{log.response_time_ms}ms</span>
+                        </div>
+                      )}
+
+                      {/* Error Indicator (only if error exists) */}
                       {log.error_message && (
-                        <div className="mt-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700">
-                          {log.error_message}
+                        <div className="flex items-center gap-1 text-red-500 whitespace-nowrap">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          <span className="font-medium">Error</span>
                         </div>
                       )}
                     </div>
-                  ))
-                )}
+                    {/* Error Message Section (if exists, on new line) */}
+                    {log.error_message && (
+                      <div className="mt-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700">
+                        {log.error_message}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between pt-6 pb-2">
+                <div className="text-sm text-gray-600">
+                  Total: {getPaginatedLogs().totalCount} logs
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="gap-1 h-9"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm">Page {currentPage} of {Math.ceil(getPaginatedLogs().totalCount / itemsPerPage)}</span>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage >= Math.ceil(getPaginatedLogs().totalCount / itemsPerPage)}
+                    className="gap-1 h-9"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </ScrollArea>
+            </div>
           </CardContent>
         </Card>
       </div>
