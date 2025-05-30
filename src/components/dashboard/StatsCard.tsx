@@ -5,15 +5,11 @@ import { CircleAlert, CircleCheck, Circle } from "lucide-react";
 interface StatsCardProps {
   title: string;
   value: string | number;
-  description?: string;
   icon?: "healthy" | "critical" | "warning" | "unknown";
-  change?: {
-    type: "increase" | "decrease";
-    value: string;
   };
-}
 
-export function StatsCard({ title, value, description, icon, change }: StatsCardProps) {
+
+export function StatsCard({ title, value, icon }: StatsCardProps) {
   const getIcon = () => {
     switch (icon) {
       case "healthy":
@@ -52,17 +48,8 @@ export function StatsCard({ title, value, description, icon, change }: StatsCard
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        {(description || change) && (
-          <p className="text-xs text-muted-foreground mt-1">
-            {change && (
-              <span>
-                {change.type === "increase" ? "↑" : "↓"} {change.value}{" "}
-              </span>
-            )}
-            {description}
-          </p>
-        )}
-      </CardContent>
+    
+         </CardContent>
     </Card>
   );
 }
