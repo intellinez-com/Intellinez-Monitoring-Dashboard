@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Loader2, Download } from "lucide-react";
+import Loader from "../components/ui/Loader"
  
 type Website = {
     id: string;
@@ -254,6 +255,7 @@ const WebVitalsDashboard: React.FC = () => {
                 </div>
             </CardHeader>
             <CardContent className="h-[500px] flex flex-col justify-center">
+                {/* {loading && <Loader text="Loading metrics..." />} */}
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                         <Loader2 className="w-6 h-6 animate-spin" />
@@ -263,6 +265,7 @@ const WebVitalsDashboard: React.FC = () => {
                     <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
                         No data available for selected website, device, and time window.
                     </div>
+                    // <Loader text="Loading websites..."/>
                 ) : (
                     <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto">
                         <div className="flex flex-wrap gap-6 justify-center items-stretch w-full">

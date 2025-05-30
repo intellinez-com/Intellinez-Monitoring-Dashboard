@@ -30,9 +30,10 @@ const Index = () => {
           website_id,
           response_time_ms,
           checked_at,
-          website:websites!inner(website_name)
+          website:websites!inner(website_name, is_active)
         `)
         .gte('checked_at', oneHourAgo.toISOString())
+        .eq('website.is_active',true)
         .order('checked_at', { ascending: true });
 
       if (error) throw error;

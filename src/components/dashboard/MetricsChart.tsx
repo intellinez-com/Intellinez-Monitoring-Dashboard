@@ -33,6 +33,7 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
   const [zoomData, setZoomData] = useState<DataPoint[]>(data);
   const [focusedMetricKey, setFocusedMetricKey] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     setZoomData(data);
@@ -66,13 +67,18 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
     setRefAreaRight(null);
   };
 
+  // Handle mouse leave on chart to clear focus if it was set by hover
+  const handleChartMouseLeave = () => {
+    setFocusedMetricKey(null);
+  };
+
   // Legend click handler
   const handleLegendClick = (e: any) => {
     const clickedKey = e.dataKey;
     setFocusedMetricKey((prev) => (prev === clickedKey ? null : clickedKey));
   };
 
-  // custom legend renderer
+  // custom legend renderer {not used for now}
   const renderCustomLegend = (props: any) => {
     const { payload } = props;
     return (
@@ -82,7 +88,7 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
           return (
             <div
               key={`item-${index}`}
-              onClick={() => {handleLegendClick(entry);console.log("clicked");}}
+              onClick={() => { handleLegendClick(entry); console.log("clicked"); }}
               style={{
                 cursor: 'pointer',
                 marginBottom: 6,
@@ -101,6 +107,30 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
     );
   };
 
+  if (loading) {
+    setTimeout(()=> setLoading(false),1000);
+    return (
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>{title}</CardTitle>
+              {description && <CardDescription>{description}</CardDescription>}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="h-[300px] flex items-center justify-center">
+          <div className="flex flex-col items-center">
+            <svg className="animate-spin h-8 w-8 text-gray-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span className="text-muted-foreground">Loading data...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!data || data.length === 0) {
     return (
@@ -146,6 +176,7 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
             onMouseDown={e => e && setRefAreaLeft(e.activeLabel)}
             onMouseMove={e => refAreaLeft && e && setRefAreaRight(e.activeLabel)}
             onMouseUp={zoom}
+            onMouseLeave={handleChartMouseLeave}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#888" opacity={0.2} />
             <XAxis
@@ -164,16 +195,21 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
               style={{ fontSize: 11 }}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "rgba(17, 25, 40, 0.8)",
-                border: "none",
-                borderRadius: "8px",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                color: "white"
-              }}
-              labelFormatter={(value) => {
-                const date = new Date(value);
-                return date.toLocaleString();
+              content={({ active, payload, label }) => {
+                if (!active || !payload || payload.length === 0) return null;
+                // Only show the hovered line's value (the first in payload)
+                const hovered = payload[0];
+                return (
+                  <div className="bg-slate-900/90 text-white rounded px-3 py-2 shadow text-xs">
+                    <div className="font-semibold mb-1">{hovered.name}</div>
+                    <div>
+                      <span className="opacity-70">Time:</span> {new Date(label).toLocaleTimeString()}
+                    </div>
+                    <div>
+                      <span className="opacity-70">Value:</span> {hovered.value}
+                    </div>
+                  </div>
+                );
               }}
             />
             <Legend
@@ -187,16 +223,16 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
                 paddingLeft: '10px'
               }}
               onClick={handleLegendClick}
-              // content={renderCustomLegend}
             />
-            {/* Conditional message on chart */}
             {focusedMetricKey && (
               <text
-                x={600}
-                y={10}
+                x="50%"
+                y={30}
+                textAnchor="middle"
                 fill="#333"
-                fontSize={14}
+                fontSize={16}
                 fontWeight="bold"
+                className="select-none"
               >
                 Showing data for: {
                   metrics.find(m => m.key === focusedMetricKey)?.name || focusedMetricKey
