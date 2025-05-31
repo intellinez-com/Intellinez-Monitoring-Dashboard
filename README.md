@@ -1,73 +1,174 @@
-# Welcome to your Lovable project
+# Intellinez Monitoring Dashboard
 
-## Project info
+A comprehensive website monitoring dashboard that provides real-time monitoring, health status tracking, and detailed analytics for web applications and services.
 
-**URL**: https://lovable.dev/projects/54a9bbec-2cec-4659-b1af-a7523870f764
+## 🚀 Project Overview
 
-## How can I edit this code?
+Intellinez Monitoring Dashboard is a modern web application designed to monitor website uptime, performance, and health metrics for Intellinez Systems. It provides business and developers with critical insights into our web infrastructure through an intuitive dashboard, real-time alerts, and comprehensive logging capabilities.
 
-There are several ways of editing your application.
+### Why Intellinez Monitoring Dashboard?
 
-**Use Lovable**
+- **Real-time Monitoring**: Track website uptime and performance metrics in real-time
+- **Comprehensive Analytics**: Detailed response time charts, status code tracking, and error monitoring
+- **User-friendly Dashboard**: Clean, modern interface built with React and TailwindCSS
+- **Scalable Architecture**: Built on Supabase for reliable data storage and real-time updates
+- **Advanced Filtering**: Filter logs by time range, health status, and error conditions
+- **Export Capabilities**: Export monitoring data to CSV for further analysis
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/54a9bbec-2cec-4659-b1af-a7523870f764) and start prompting.
+## 🛠️ Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+### Frontend
+- **React 18** - Modern React with hooks and functional components
+- **TypeScript** - Type-safe development experience
+- **Vite** - Fast build tool and development server
+- **TailwindCSS** - Utility-first CSS framework
+- **Shadcn/UI** - High-quality component library
+- **Lucide React** - Beautiful, customizable icons
+- **Chart.js** - Interactive data visualization
 
-**Use your preferred IDE**
+### Backend & Infrastructure
+- **Supabase** - Backend-as-a-Service (Database, Auth, Real-time)
+- **PostgreSQL** - Robust relational database
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Development Tools
+- **ESLint** - Code linting and quality enforcement
+- **Prettier** - Code formatting
+- **TypeScript** - Static type checking
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 📋 Features
 
-Follow these steps:
+### Core Monitoring Features
+- ✅ **Website Health Monitoring** - Track uptime and availability
+- ✅ **Response Time Tracking** - Monitor performance metrics
+- ✅ **Status Code Monitoring** - HTTP response code tracking
+- ✅ **SSL Certificate Monitoring** - SSL/TLS certificate validation
+- ✅ **Proxy Server Detection** - Identify proxy configurations
+- ✅ **Error Logging** - Comprehensive error tracking and reporting
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Dashboard Features
+- ✅ **Real-time Dashboard** - Live monitoring overview
+- ✅ **Interactive Charts** - Response time trends and analytics
+- ✅ **Advanced Filtering** - Filter by time range, status, and error conditions
+- ✅ **Detailed Logs** - Comprehensive monitoring history
+- ✅ **Export Functionality** - CSV export for data analysis
+- ✅ **Responsive Design** - Mobile-friendly interface
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Authentication & Security
+- ✅ **JWT Authentication** - Secure user authentication via Supabase
+- ✅ **Protected Routes** - Route-level access control
+- ✅ **User Management** - User registration and profile management
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 🚀 Getting Started
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### Prerequisites
+
+- **Node.js** (v18.0.0 or higher)
+- **npm** or **yarn** package manager
+- **Supabase Account** - For backend services
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/insight-health-portal.git
+   cd insight-health-portal
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+3. **Environment Configuration**
+   
+   Create a `.env.local` file in the root directory:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_project_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+4. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open the application**
+   
+   Navigate to `http://localhost:5173` in your browser.
+
+## 📁 Project Structure
+
+```
+insight-health-portal/
+├── public/                    # Static assets
+├── src/
+│   ├── components/           # Reusable UI components
+│   │   ├── dashboard/        # Dashboard-specific components
+│   │   ├── ui/              # Base UI components (shadcn/ui)
+│   ├── hooks/               # Custom React hooks
+│   ├── lib/                 # Utility libraries
+│   ├── pages/               # Page components  
+│   ├── types/               # TypeScript type definitions
+│   ├── App.tsx              # Main application component
+│   ├── main.tsx            # Application entry point
+│   └── index.css           # Global styles
+├── .env.local              # Environment variables
+├── tailwind.config.js      # TailwindCSS configuration
+├── vite.config.ts         # Vite configuration
+└── package.json           # Project dependencies
 ```
 
-**Edit a file directly in GitHub**
+## ⚙️ Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The following environment variables are required to run the application:
 
-**Use GitHub Codespaces**
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `VITE_SUPABASE_URL` | Your Supabase project URL | ✅ |
+| `VITE_SUPABASE_ANON_KEY` | Your Supabase anonymous key | ✅ |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### How to get Supabase credentials:
 
-## What technologies are used for this project?
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Go to Settings > API
+3. Copy the Project URL and anon public key
+4. Add them to your `.env.local` file
 
-This project is built with:
+## 🗄️ Database Schema
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The application uses the following main tables:
 
-## How can I deploy this project?
+- **`websites`** - Website configuration and metadata
+- **`website_monitoring_logs`** - Monitoring history and metrics
+- **`users`** - User authentication and profiles
 
-Simply open [Lovable](https://lovable.dev/projects/54a9bbec-2cec-4659-b1af-a7523870f764) and click on Share -> Publish.
+## 🧪 Available Scripts
 
-## Can I connect a custom domain to my Lovable project?
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Run ESLint |
+| `npm run type-check` | Run TypeScript compiler check |
 
-Yes, you can!
+## 🤝 Contributing
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 🙏 Acknowledgments
+
+- [Supabase](https://supabase.com) - Backend infrastructure
+- [Shadcn/UI](https://ui.shadcn.com) - Component library
+- [TailwindCSS](https://tailwindcss.com) - CSS framework
+- [Chart.js](https://www.chartjs.org) - Data visualization
+
+---
+
+Built with ❤️ by the Intellinez Systems team
