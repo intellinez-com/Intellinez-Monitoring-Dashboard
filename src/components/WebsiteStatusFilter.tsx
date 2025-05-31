@@ -1,8 +1,7 @@
 import { CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-
-type FilterOption = "All" | "Healthy" | "Degraded" | "Offline";
+type FilterOption = "All" | "Healthy" | "Degraded" | "Offline" | "Intermittent";
 
 interface WebsiteStatusFilterProps {
   activeFilter: FilterOption;
@@ -12,6 +11,7 @@ interface WebsiteStatusFilterProps {
     healthy: number;
     degraded: number;
     offline: number;
+    intermittent: number;
   };
 }
 
@@ -45,6 +45,12 @@ export function WebsiteStatusFilter({
       className: "bg-yellow-100 text-yellow-900 hover:bg-yellow-200",
     },
     {
+      value: "Intermittent",
+      label: "Intermittent",
+      icon: <XCircle className="h-4 w-4" />,
+      className: "bg-orange-100 text-orange-900 hover:bg-orange-200",
+    },
+    {
       value: "Offline",
       label: "Offline",
       icon: <XCircle className="h-4 w-4" />,
@@ -75,6 +81,9 @@ export function WebsiteStatusFilter({
               filter.value === "Offline" &&
               "ring-red-400",
             activeFilter === filter.value &&
+              filter.value === "Intermittent" &&
+              "ring-grey-400",
+            activeFilter === filter.value &&
               filter.value === "All" &&
               "ring-zinc-400"
           )}
@@ -88,6 +97,8 @@ export function WebsiteStatusFilter({
               ? counts.healthy
               : filter.value === "Degraded"
               ? counts.degraded
+              : filter.value === "Intermittent"
+              ? counts.intermittent
               : counts.offline}
           </span>
         </button>

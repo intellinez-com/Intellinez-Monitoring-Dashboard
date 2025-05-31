@@ -6,7 +6,7 @@ export interface SSLData {
 }
 
 
-export type HealthStatus = "Healthy" | "Degraded" | "Offline" | "Unknown";
+export type HealthStatus = "Healthy" | "Degraded" | "Offline" | "Intermittent" | "Unknown";
 
 export interface Website {
   id: string;

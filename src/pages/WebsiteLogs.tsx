@@ -20,9 +20,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatDistanceToNow } from "date-fns";
-import { Separator } from "@/components/ui/separator";
+
 import { cn } from "@/lib/utils";
 import {
   Chart as ChartJS,
@@ -47,16 +45,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-const chartContainerStyle = {
-  minHeight: '32px',
-  width: '96px',
-  position: 'relative' as const,
-  marginLeft: '8px',
-  display: 'inline-block',
-  verticalAlign: 'middle'
-};
-
-import { Bar, Chart } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
 
 ChartJS.register(
   CategoryScale,
@@ -69,8 +58,6 @@ ChartJS.register(
   PointElement,
   LineController
 );
-
-
 
 interface MonitoringLog {
   id: string;
@@ -87,10 +74,9 @@ interface MonitoringLog {
   User_Id: string | null;
 }
 
-// Add this type for time filter
-// type TimeFilter = '1h' | '12h' | '1d' | '1w';
-type ChartTimeFilterType = '1h' | '12h' | '1d' | '1w';
-type LogTimeFilterType = '1h' | '6h' | '1d' | '1w';
+// type TimeFilter = '1h' | '6h' | '12h' | '24h';
+type ChartTimeFilterType = '1h' | '6h' | '12h' | '24h';
+type LogTimeFilterType = '1h' | '6h' | '12h' | '24h';
 
 export default function WebsiteLogs() {
   const { id } = useParams();
@@ -98,7 +84,9 @@ export default function WebsiteLogs() {
   const navigate = useNavigate();
   const [logs, setLogs] = useState<MonitoringLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const websiteName = location.state?.websiteName || "Website";
+
+  const urlParams = new URLSearchParams(location.search);
+  const websiteName = urlParams.get('name') || location.state?.websiteName || "Website";
 
   // Add these to your component's state
   // const [timeFilter, setTimeFilter] = useState<TimeFilter>('1h');
@@ -130,12 +118,12 @@ export default function WebsiteLogs() {
       switch (chartTimeFilter) {
         case '1h':
           return diffInHours <= 1;
+        case '6h':
+          return diffInHours <= 6;
         case '12h':
           return diffInHours <= 12;
-        case '1d':
+        case '24h':
           return diffInHours <= 24;
-        case '1w':
-          return diffInHours <= 24 * 7;
         default:
           return diffInHours <= 1;
       }
@@ -178,7 +166,6 @@ export default function WebsiteLogs() {
     }
   };
 
-
   // Add this function to filter logs based on time
   const getFilteredLogs = () => {
     const now = new Date();
@@ -195,9 +182,9 @@ export default function WebsiteLogs() {
           return diffInHours <= 1;
         case '6h':
           return diffInHours <= 6;
-        case '1d':
+        case '12h':
           return diffInHours <= 24;
-        case '1w':
+        case '24h':
           return diffInHours <= 24 * 7;
         default:
           return diffInHours <= 1;
@@ -245,9 +232,9 @@ export default function WebsiteLogs() {
     const chartLogs = sortedLogs;
 
     let barThicknessValue = 8;
-    if (currentChartTimeFilter === '12h') barThicknessValue = 6;
-    else if (currentChartTimeFilter === '1d') barThicknessValue = 4;
-    else if (currentChartTimeFilter === '1w') barThicknessValue = 2;
+    if (currentChartTimeFilter === '6h') barThicknessValue = 6;
+    else if (currentChartTimeFilter === '12h') barThicknessValue = 4;
+    else if (currentChartTimeFilter === '24h') barThicknessValue = 2;
 
     const responseTimes = chartLogs.map(log => log.response_time_ms || 0);
     const maxResponseTimeInView = responseTimes.length > 0 ? Math.max(...responseTimes) : 0;
@@ -419,18 +406,6 @@ export default function WebsiteLogs() {
     document.body.removeChild(link);
   };
 
-  const getHealthStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "healthy":
-        return "bg-emerald-100 text-emerald-700 border-emerald-200";
-      case "degraded":
-        return "bg-yellow-100 text-yellow-700 border-yellow-200";
-      case "offline":
-        return "bg-red-100 text-red-700 border-red-200";
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  };
 
   const getHealthStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
@@ -462,13 +437,13 @@ export default function WebsiteLogs() {
               variant="ghost"
               size="sm"
               onClick={() => navigate(-1)}
-              className="gap-2"
+              className="gap-2 bg-zinc-200"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">{websiteName} Monitoring Logs</h1>
+              <h1 className="text-3xl font-bold">{websiteName}<span className="text-2xl font-semibold"> Monitoring Logs</span></h1>
             </div>
           </div>
           <div className="flex gap-2">
@@ -515,6 +490,14 @@ export default function WebsiteLogs() {
                       Last Hour
                     </Button>
                     <Button
+                      variant={chartTimeFilter === '6h' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setChartTimeFilter('6h')}
+                      className="h-7 text-xs"
+                    >
+                      6 Hours
+                    </Button>
+                    <Button
                       variant={chartTimeFilter === '12h' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setChartTimeFilter('12h')}
@@ -523,20 +506,12 @@ export default function WebsiteLogs() {
                       12 Hours
                     </Button>
                     <Button
-                      variant={chartTimeFilter === '1d' ? 'default' : 'outline'}
+                      variant={chartTimeFilter === '24h' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setChartTimeFilter('1d')}
+                      onClick={() => setChartTimeFilter('24h')}
                       className="h-7 text-xs"
                     >
-                      1 Day
-                    </Button>
-                    <Button
-                      variant={chartTimeFilter === '1w' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setChartTimeFilter('1w')}
-                      className="h-7 text-xs"
-                    >
-                      1 Week
+                      24 Hours
                     </Button>
                     {/* New Switch for chart: Show Unhappy Only */}
                     <div className="flex items-center space-x-2 pl-2">
@@ -596,8 +571,8 @@ export default function WebsiteLogs() {
                     <SelectContent>
                       <SelectItem value="1h">Last Hour</SelectItem>
                       <SelectItem value="6h">Last 6 Hours</SelectItem>
-                      <SelectItem value="1d">Last Day</SelectItem>
-                      <SelectItem value="1w">Last Week</SelectItem>
+                      <SelectItem value="1d">Last 12 hours</SelectItem>
+                      <SelectItem value="1w">Last 24 hours</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

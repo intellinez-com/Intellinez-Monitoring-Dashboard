@@ -31,7 +31,6 @@ interface WebsiteStatusCardProps {
   isMonitoring: boolean;
 }
 
-
 export function WebsiteStatusCard({
   website,
   onDelete,
@@ -44,15 +43,18 @@ export function WebsiteStatusCard({
   const status = website.health_status || "Unknown";
 
   const statusColor = {
-    Healthy: "text-status-healthy",
-    Degraded: "text-status-warning",
-    Offline: "text-status-critical",
+    Healthy: "text-emerald-500",
+    Degraded: "text-yellow-500",
+    Offline: "text-red-500",
+    Intermittent: "text-orange-500",
     Unknown: "text-gray-400",
   }[status];
 
   // Add this function to handle logs navigation
   const handleViewLogs = () => {
-    navigate(`/logs/${website.id}`, { state: { websiteName: website.website_name } });
+    navigate(`/logs/${website.id}`, {
+      state: { websiteName: website.website_name },
+    });
   };
 
   const [copied, setCopied] = useState(false);
@@ -75,12 +77,7 @@ export function WebsiteStatusCard({
     healthy: "bg-status-healthy/10",
     degraded: "bg-status-warning/10",
     offline: "bg-status-critical/10",
-  };
-
-  const statusPulseColor = {
-    healthy: "bg-emerald-400",
-    degraded: "bg-yellow-400",
-    offline: "bg-red-500",
+    intermittent: "bg-gray-100/10",
   };
 
   // Add this helper function inside your component
@@ -120,7 +117,9 @@ export function WebsiteStatusCard({
 
   //function to truncate lengthy website names
   const truncateWebsiteName = (name: string, maxLength: number = 18) => {
-    return name.length > maxLength ? `${name.substring(0, maxLength)}...` : name;
+    return name.length > maxLength
+      ? `${name.substring(0, maxLength)}...`
+      : name;
   };
 
   const copyToClipboard = async () => {
@@ -138,11 +137,12 @@ export function WebsiteStatusCard({
       <Card
         className={cn(
           // Glassmorphism + shadow + border
-          "group relative overflow-hidden rounded-xl border border-border/60 shadow-xl transition-all duration-300 hover:scale-[1.025] hover:shadow-2xl",
+          "group relative overflow-hidden rounded-xl border border-border/60 shadow-md transition-all duration-300 hover:scale-[1.025] hover:shadow-2xl",
           "bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md",
           website.health_status === "Healthy" && "ring-2 ring-emerald-200/60",
           website.health_status === "Degraded" && "ring-2 ring-yellow-200/60",
           website.health_status === "Offline" && "ring-2 ring-red-200/60",
+          website.health_status === "Intermittent" && "ring-2 ring-gray-200/60",
           !isMonitoring && "filter grayscale-[0.7]"
         )}
         style={{
@@ -150,8 +150,10 @@ export function WebsiteStatusCard({
             website.health_status === "Healthy"
               ? "0 4px 24px 0 rgba(16,185,129,0.10)"
               : website.health_status === "Degraded"
-                ? "0 4px 24px 0 rgba(251,191,36,0.10)"
-                : "0 4px 24px 0 rgba(239,68,68,0.10)",
+              ? "0 4px 24px 0 rgba(251,191,36,0.10)"
+              : website.health_status === "Intermittent"
+              ? "0 4px 24px 0 rgba(107,114,128,0.10)"
+              : "0 4px 24px 0 rgba(239,68,68,0.10)",
         }}
       >
         <div
@@ -159,11 +161,21 @@ export function WebsiteStatusCard({
             "absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-30 blur-2xl pointer-events-none",
             website.health_status === "Healthy" && "bg-emerald-200",
             website.health_status === "Degraded" && "bg-yellow-200",
-            website.health_status === "Offline" && "bg-red-200"
+            website.health_status === "Offline" && "bg-red-200",
+            website.health_status === "Intermittent" && "bg-gray-200"
+          )}
+        />
+        <div
+          className={cn(
+            "absolute -bottom-10 -left-10 w-60 h-28 rounded-full opacity-30 blur-2xl pointer-events-none",
+            website.health_status === "Healthy" && "bg-emerald-200",
+            website.health_status === "Degraded" && "bg-yellow-200",
+            website.health_status === "Offline" && "bg-red-200",
+            website.health_status === "Intermittent" && "bg-gray-200"
           )}
         />
 
-        <CardHeader className="p-6 pb-3">
+        <CardHeader className="px-4">
           <div className="flex justify-between items-start space-x-4">
             {/* Website Info Section */}
             <div className="flex-1 space-y-2">
@@ -176,7 +188,7 @@ export function WebsiteStatusCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="p-0 h-4 w-4 hover:bg-transparent"
+                      className=" h-4 w-4 hover:bg-transparent"
                       onClick={(e) => {
                         e.preventDefault();
                         setShowDetailsModal(true);
@@ -229,22 +241,25 @@ export function WebsiteStatusCard({
             {/* Status Badge */}
             <div
               className={cn(
-                "px-4 py-2 rounded-full flex items-center gap-2 shadow-sm border font-semibold text-base",
-                statusBackgroundColor[website.health_status.toLowerCase()],
-                "transition-all duration-300 hover:scale-105"
+                "px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm border",
+                {
+                  "bg-emerald-100 border-emerald-200":
+                    website.health_status === "Healthy",
+                  "bg-yellow-100 border-yellow-200":
+                    website.health_status === "Degraded",
+                  "bg-red-100 border-red-200":
+                    website.health_status === "Offline",
+                  "bg-orange-100 border-orange-200":
+                    website.health_status === "Intermittent",
+                  "bg-gray-100 border-gray-200":
+                    website.health_status === "Unknown",
+                },
+                "transition-all duration-300"
               )}
             >
-              <Circle
-                className={cn(
-                  "h-3 w-3 fill-current",
-                  statusColor[website.health_status.toLowerCase()]
-                )}
-              />
+              <Circle className={cn("h-2.5 w-2.5 fill-current", statusColor)} />
               <span
-                className={cn(
-                  "capitalize",
-                  statusColor[website.health_status.toLowerCase()]
-                )}
+                className={cn("capitalize text-sm font-medium", statusColor)}
               >
                 {website.health_status}
               </span>
@@ -252,9 +267,9 @@ export function WebsiteStatusCard({
           </div>
         </CardHeader>
 
-        <CardContent className="p-6 pt-2 grid gap-4">
+        <CardContent className="px-4 grid gap-4">
           {/* Website Meta Info */}
-          <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+          <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <span>
                 Last checked:{" "}
@@ -264,7 +279,7 @@ export function WebsiteStatusCard({
               </span>
             </div>
 
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-2 sm:text-xs">
               <span>
                 Response:{" "}
                 <span className="font-semibold text-zinc-700 dark:text-zinc-200">
@@ -274,23 +289,38 @@ export function WebsiteStatusCard({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">
-              SSL Status :{" "}
-              <span className="font-semibold text-zinc-700 dark:text-zinc-200">
+          <div className="grid grid-cols-1 gap-1 text-xs sm:text-xs text-zinc-600 dark:text-zinc-300 leading-tight">
+            {/* SSL Status */}
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">SSL Status:</span>
+              <span className="font-bold text-zinc-700 dark:text-zinc-200">
                 {website.certificate_status || "N/A"}
               </span>
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-semibold">Domain Expiry:</span>
-            <div
-              className={cn(
-                "font-semibold flex items-center",
-                getExpiryStatus(website.domain_expiry).color
-              )}
-            >
-              <div className="flex items-center gap-1">
+            </div>
+
+            {/* SSL Expiry */}
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">SSL Expiry:</span>
+              <div
+                className={cn(
+                  "flex items-center gap-1",
+                  getExpiryStatus(website.ssl_expiry).color
+                )}
+              >
+                {getExpiryStatus(website.ssl_expiry).icon}
+                <span>{formatDate(website.ssl_expiry)}</span>
+              </div>
+            </div>
+
+            {/* Domain Expiry */}
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">Domain Expiry:</span>
+              <div
+                className={cn(
+                  "flex items-center gap-1",
+                  getExpiryStatus(website.domain_expiry).color
+                )}
+              >
                 {getExpiryStatus(website.domain_expiry).icon}
                 <span>{formatDate(website.domain_expiry)}</span>
               </div>
@@ -300,81 +330,50 @@ export function WebsiteStatusCard({
           {/* Footer Section */}
           <div
             className={cn(
-              "mt-2 px-4 py-3 rounded-md flex items-center justify-between text-xs font-medium shadow-inner border",
-              "transition-colors duration-300",
-              website.health_status === "Healthy" &&
-              "bg-emerald-50/70 text-emerald-700 border-emerald-200",
-              website.health_status === "Degraded" &&
-              "bg-yellow-50/70 text-yellow-800 border-yellow-200",
-              website.health_status === "Offline" &&
-              "bg-red-50/70 text-red-700 border-red-200",
-              website.health_status === "Unknown" &&
-              "bg-zinc-100/80 text-zinc-500 border-zinc-300"
+              "rounded-md flex items-center justify-end gap-3 duration-300"
             )}
           >
-            {/* Left: Created Date */}
-            <span>
-              Created at:{" "}
-              <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-                {new Date(website.created_at).toLocaleString()}
-              </span>
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleViewLogs}
+                  className="h-8 w-8  rounded-full hover:bg-blue-100 hover:text-blue-700 transition"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>View logs</TooltipContent>
+            </Tooltip>
 
-            {/* Right: Action Buttons */}
-            <div className="flex items-center gap-3">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleViewLogs}
-                    className={cn(
-                      "h-8 w-8 p-0 rounded-full border border-transparent",
-                      "hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700",
-                      "transition-all duration-200"
-                    )}
-                  >
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>View logs</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onUpdate(website)}
-                    className={cn(
-                      "h-8 w-8 p-0 rounded-full border border-transparent",
-                      "hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700",
-                      "transition-all duration-200"
-                    )}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Edit website</TooltipContent>
-              </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onUpdate(website)}
+                  className="h-8 w-8 rounded-full hover:bg-emerald-100 hover:text-emerald-700 transition"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit</TooltipContent>
+            </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(website.id)}
-                    className={cn(
-                      "h-8 w-8 p-0 rounded-full border border-transparent",
-                      "hover:border-red-300 hover:bg-red-50 hover:text-red-700",
-                      "transition-all duration-200"
-                    )}
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Delete website</TooltipContent>
-              </Tooltip>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(website.id)}
+                  className="h-8 w-8  rounded-full hover:bg-red-100 hover:text-red-700 transition"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
           </div>
         </CardContent>
 
@@ -439,11 +438,11 @@ export function WebsiteStatusCard({
             {/* SSL Certificate Section */}
 
             <div className="grid gap-4">
-              <h3 className="font-semibold text-lg">SSL Certificate</h3>
+              <h3 className="font-semibold text-lg">SSL and Domain Info</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status:</span>
+                    <span className="text-muted-foreground">SSL Status:</span>
                     <span>{website.certificate_status || "N/A"}</span>
                   </div>
                   <div className="flex justify-between">

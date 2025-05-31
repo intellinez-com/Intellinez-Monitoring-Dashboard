@@ -34,7 +34,7 @@ export function WebsiteManager() {
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [websiteToUpdate, setWebsiteToUpdate] = useState<Website | null>(null);
   const [activeFilter, setActiveFilter] = useState<
-    "All" | "Healthy" | "Degraded" | "Offline"
+    "All" | "Healthy" | "Degraded" | "Offline" | "Intermittent"
   >("All");
   const [is_Monitoring, setIs_Monitoring] = useState(() => {
     // Get the stored value on initial load
@@ -65,6 +65,7 @@ export function WebsiteManager() {
     healthy: websites.filter((w) => w.health_status === "Healthy").length,
     degraded: websites.filter((w) => w.health_status === "Degraded").length,
     offline: websites.filter((w) => w.health_status === "Offline").length,
+    intermittent: websites.filter((w) => w.health_status === "Intermittent").length,
   };
 
   //Getting user details through hook
@@ -284,27 +285,7 @@ export function WebsiteManager() {
       if (error) throw error;
 
       if (data?.[0]) {
-        // Transform the updated data to match Website interface
-        const updatedWebsite: Website = {
-          ...websiteToUpdate,
-          website_name: data[0].website_name,
-          url: data[0].url,
-          updated_at: data[0].updated_at,
-          updated_by: data[0].updated_by,
-          // Preserve existing monitoring data if no new data
-          health_status:
-            data[0].website_monitoring_logs?.[0]?.health_status ||
-            websiteToUpdate.health_status,
-          response_time_ms:
-            data[0].website_monitoring_logs?.[0]?.response_time_ms ||
-            websiteToUpdate.response_time_ms,
-          status_code:
-            data[0].website_monitoring_logs?.[0]?.status_code ||
-            websiteToUpdate.status_code,
-          checked_at:
-            data[0].website_monitoring_logs?.[0]?.checked_at ||
-            websiteToUpdate.checked_at,
-        };
+
         toast({
           title: "Success",
           description: "Website updated successfully",
@@ -330,43 +311,43 @@ export function WebsiteManager() {
   // the website status fetch logic
   const fetchWebsites = async () => {
     if (!userId) return;
-  
+
     let freshData = [];
-  
+
     try {
       // Start lightweight spinner without full UI block
       setIsLoading((prev) => (!prev ? true : prev));
-  
+
       // Optional debounce delay
       await new Promise((resolve) => setTimeout(resolve, 500));
-  
+
       const { data, error } = await supabase
         .from("latest_active_website_data")
         .select("*");
-  
+
       if (error) throw error;
-  
+
       console.log("Fetched website monitoring logs:", data);
-  
+
       freshData =
         data?.map((website) => ({
           id: website.id,
           website_name: website.website_name,
           url: website.url,
           is_active: website.is_active,
-  
+
           // Latest monitoring data (flat, no nesting now)
           health_status: website.latest_health_status || "Unknown",
           response_time_ms: website.latest_response_time_ms ?? "N/A",
           status_code: website.latest_status_code ?? 0,
           checked_at: website.latest_checked_at || website.created_at,
-  
+
           // Timestamps and authorship
           created_at: website.created_at,
           updated_at: website.updated_at,
           created_by: website.created_by,
           updated_by: website.updated_by,
-  
+
           // Latest SSL info
           ssl_expiry: website.ssl_expiry || null,
           issuer: website.issuer || null,
@@ -374,7 +355,7 @@ export function WebsiteManager() {
           last_checked: website.ssl_last_checked || null,
           domain_expiry: website.domain_expiry || null,
         })) || [];
-  
+
       console.log("Final transformed website data:", freshData);
     } catch (error) {
       console.error("Error fetching websites:", error);
@@ -396,7 +377,7 @@ export function WebsiteManager() {
     }
   };
 
-  
+
 
   // Initial fetch and auto-refresh logic
   useEffect(() => {
@@ -406,7 +387,7 @@ export function WebsiteManager() {
 
     const intervalId = setInterval(() => {
       fetchWebsites();
-    }, 35000);
+    }, 55000);
 
     return () => clearInterval(intervalId);
   }, [userId, is_Monitoring]);
@@ -416,8 +397,9 @@ export function WebsiteManager() {
     const statusPriority = {
       Offline: 1,
       Degraded: 2,
-      Healthy: 3,
-      Unknown: 4,
+      Intermittent: 3,
+      Healthy: 4,
+      Unknown: 5,
     };
 
     return [...websites].sort((a, b) => {
@@ -447,21 +429,21 @@ export function WebsiteManager() {
       })
   );
 
-  
+
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <Dialog open={isOpen} onOpenChange={handleDialogOpen}>
-                 <div className="relative w-60">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground/60" />
-          <Input
-            placeholder="Search websites..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm"
-          />
-        </div>
+          <div className="relative w-60">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground/60" />
+            <Input
+              placeholder="Search websites..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm"
+            />
+          </div>
           <WebsiteStatusFilter
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
@@ -532,107 +514,87 @@ export function WebsiteManager() {
           </DialogContent>
         </Dialog>
       </div>
-      <div className="flex justify-between ">
+      <div className="flex justify-start items-center gap-5 px-4">
+        {/* Monitoring Toggle Button */}
         <Button
-            variant="outline"
-            className={`
-    ml-4 flex items-center gap-4 px-3 py-3
-    rounded-full border-[3px] transition-all duration-500 ease-in-out
-    transform hover:scale-102 group relative
-    backdrop-blur-sm
-    ${
-      is_Monitoring
-        ? "border-emerald-400/50 bg-gradient-to-r from-emerald-500/90 to-green-400/90 text-white  shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:from-emerald-400 hover:to-green-300"
-        : "border-zinc-300/50 bg-gradient-to-r from-zinc-100/90 to-slate-50/90 text-zinc-700 shadow-zinc-300/20 hover:shadow-zinc-300/40 hover:from-zinc-200 hover:to-slate-100"
-    }
+          variant="outline"
+          className={`
+    flex items-center gap-3 px-2 py-2
+    rounded-full border-[2.5px] transition-all duration-500 ease-in-out
+    transform hover:scale-102 group relative backdrop-blur-sm
+    text-xs
+    ${is_Monitoring
+              ? "border-emerald-400/50 bg-gradient-to-r from-emerald-500/90 to-green-400/90 text-white shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:from-emerald-400 hover:to-green-300"
+              : "border-zinc-300/50 bg-gradient-to-r from-zinc-100/90 to-slate-50/90 text-zinc-700 shadow-zinc-300/20 hover:shadow-zinc-300/40 hover:from-zinc-200 hover:to-slate-100"}
   `}
-            onClick={() => setIs_Monitoring((prev) => !prev)}
-          >
-            {/* Animated background glow effect */}
-            <div
-              className={`
-      absolute inset-0 rounded-full blur-xl transition-opacity duration-500
-      ${is_Monitoring ? "opacity-40" : "opacity-0"}
-      ${is_Monitoring ? "bg-emerald-400" : "bg-zinc-400"}
-    `}
-            />
+          onClick={() => setIs_Monitoring((prev) => !prev)}
+        >
+          {/* Glow */}
+          <div className={`
+    absolute inset-0 rounded-full blur-xl transition-opacity duration-500
+    ${is_Monitoring ? "opacity-40 bg-emerald-400" : "opacity-0 bg-zinc-400"}
+  `} />
 
-            {/* Toggle switch container */}
-            <div className="relative">
-              <div
-                className={`
-        w-12 h-7 rounded-full transition-all duration-500 ease-in-out flex items-center
-        ${is_Monitoring ? "bg-emerald-400/20" : "bg-zinc-200/50"}
-        backdrop-blur-sm border-2
-        ${is_Monitoring ? "border-white/30" : "border-zinc-300/30"}
-      `}
-              >
-                {/* Sliding circle */}
-                <div
-                  className={`
-          absolute w-5 h-5 rounded-full transition-all duration-500 ease-in-out
-          ${is_Monitoring ? "translate-x-6" : "translate-x-1"}
-          ${is_Monitoring ? "bg-white" : "bg-zinc-400"}
-          shadow-lg
-          flex items-center justify-center
-        `}
-                >
-                  {/* Pulse effect */}
-                  <div
-                    className={`
-            absolute inset-0 rounded-full
-            ${is_Monitoring ? "animate-ping bg-white/50" : "bg-transparent"}
-          `}
-                  />
-
-                  {/* Inner dot */}
-                  <div
-                    className={`
-            w-2 h-2 rounded-full transition-all duration-500
-            ${
-              is_Monitoring ? "bg-emerald-500 scale-100" : "bg-zinc-500 scale-0"
-            }
-          `}
-                  />
-                </div>
+          {/* Toggle */}
+          <div className="relative">
+            <div className={`
+      w-10 h-6 rounded-full transition-all duration-500 flex items-center
+      ${is_Monitoring ? "bg-emerald-400/20 border-white/30" : "bg-zinc-200/50 border-zinc-300/30"}
+      backdrop-blur-sm border-2
+    `}>
+              <div className={`
+        absolute w-4 h-4 rounded-full shadow-md transition-all duration-500 flex items-center justify-center
+        ${is_Monitoring ? "translate-x-5 bg-white" : "translate-x-1 bg-zinc-400"}
+      `}>
+                <div className={`absolute inset-0 rounded-full ${is_Monitoring ? "animate-ping bg-white/50" : ""}`} />
+                <div className={`
+          w-1.5 h-1.5 rounded-full transition-all duration-500
+          ${is_Monitoring ? "bg-emerald-500 scale-100" : "bg-zinc-500 scale-0"}
+        `} />
               </div>
             </div>
+          </div>
 
-            {/* Text content with icon */}
-            <span className="relative font-semibold tracking-wide text-sm flex items-center gap-2">
-              {is_Monitoring ? (
-                <>
-                  <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
-                  <span className="animate-gradient-text bg-gradient-to-r from-white to-emerald-100">
-                    Monitoring Active
-                  </span>
-                </>
-              ) : (
-                <span className="text-zinc-600">Monitoring Paused</span>
-              )}
-            </span>
+          {/* Text */}
+          <span className="relative font-medium tracking-wide text-xs flex items-center gap-2">
+            {is_Monitoring ? (
+              <>
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <span className="animate-gradient-text bg-gradient-to-r from-white to-emerald-100">Monitoring</span>
+              </>
+            ) : (
+              <span className="text-zinc-600">Paused</span>
+            )}
+          </span>
 
-            {/* Decorative circles */}
-            <div className="absolute -z-10 inset-0 overflow-hidden rounded-full">
-              {is_Monitoring && (
-                <>
-                  <div className="absolute -top-4 -right-4 w-8 h-8 rounded-full bg-emerald-300/20 blur-md animate-pulse" />
-                  <div className="absolute -bottom-4 -left-4 w-8 h-8 rounded-full bg-green-300/20 blur-md animate-pulse delay-100" />
-                </>
-              )}
-            </div>
-          </Button>
-            <div className=" w-64 flex border p-1 items-center gap-1 text-muted-foreground rounded-full justify-evenly">
-        <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
-        <button
-          onClick={fetchWebsites}
-          disabled={isLoading}
-          className="rounded-full hover:bg-muted"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-        </button>
+          {/* Decorative circles */}
+          <div className="absolute -z-10 inset-0 overflow-hidden rounded-full">
+            {is_Monitoring && (
+              <>
+                <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-emerald-300/20 blur-md animate-pulse" />
+                <div className="absolute -bottom-3 -left-3 w-6 h-6 rounded-full bg-green-300/20 blur-md animate-pulse delay-100" />
+              </>
+            )}
+          </div>
+        </Button>
+
+
+        {/* Last Updated Panel with Button on Left */}
+        <div className="w-fit max-w-[240px] flex items-center gap-2 px-3 py-1 border rounded-full bg-muted/30 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+          <button
+            onClick={fetchWebsites}
+            disabled={isLoading}
+            className="rounded-full p-1 hover:bg-muted transition"
+            title="Refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
+          <span className="whitespace-nowrap truncate">
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </span>
+        </div>
       </div>
-      </div>
+
       <hr className="my-6 border-t-2 border-gray-200 dark:border-zinc-700 rounded-full shadow-sm" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

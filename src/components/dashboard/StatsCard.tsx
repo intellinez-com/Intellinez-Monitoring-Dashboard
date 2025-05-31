@@ -1,15 +1,20 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CircleAlert, CircleCheck, Circle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface StatsCardProps {
   title: string;
   value: string | number;
+  description?: string;
   icon?: "healthy" | "critical" | "warning" | "unknown";
+  change?: {
+    type: "increase" | "decrease";
+    value: string;
   };
+  onClick?: () => void;
+}
 
-
-export function StatsCard({ title, value, icon }: StatsCardProps) {
+export function StatsCard({ title, value, description, icon, change, onClick }: StatsCardProps) {
   const getIcon = () => {
     switch (icon) {
       case "healthy":
@@ -41,15 +46,37 @@ export function StatsCard({ title, value, icon }: StatsCardProps) {
 
   
   return (
-    <Card className={getCardBgColor()}>
+    <Card 
+      className={cn(
+        getCardBgColor(),
+        onClick && "cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
+      )}
+      onClick={onClick}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {icon && getIcon()}
+        {icon && (
+          <div
+            className="transition-all duration-200 hover:scale-110 hover:opacity-80"
+            title={`View ${title.toLowerCase()} websites`}
+          >
+            {getIcon()}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-    
-         </CardContent>
+        {(description || change) && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {change && (
+              <span>
+                {change.type === "increase" ? "↑" : "↓"} {change.value}{" "}
+              </span>
+            )}
+            {description}
+          </p>
+        )}
+      </CardContent>
     </Card>
   );
 }
