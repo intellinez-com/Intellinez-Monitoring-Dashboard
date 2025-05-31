@@ -6,6 +6,7 @@ type HealthCounts = {
   healthy: number;
   degraded: number;
   offline: number;
+  intermittent: number;
   all: number;
 };
 
@@ -14,6 +15,7 @@ export const useWebsiteHealthCounts = () => {
     healthy: 0,
     degraded: 0,
     offline: 0,
+    intermittent: 0,
     all: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,7 @@ export const useWebsiteHealthCounts = () => {
       healthy: 0,
       degraded: 0,
       offline: 0,
+      intermittent: 0,
       all: 0,
     };
 

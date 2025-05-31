@@ -6,6 +6,7 @@ type WebsiteCounts = {
   healthy: number;
   degraded: number;
   offline: number;
+  intermittent: number;
 };
 
 type WebsiteStatusContextType = {
@@ -21,6 +22,7 @@ export const WebsiteStatusProvider = ({ children }: { children: ReactNode }) => 
     healthy: 0,
     degraded: 0,
     offline: 0,
+    intermittent: 0,
   });
 
   return (
