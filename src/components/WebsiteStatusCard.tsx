@@ -52,24 +52,9 @@ export function WebsiteStatusCard({
     Unknown: "text-gray-400",
   }[status];
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "healthy":
-        return "bg-emerald-500";
-      case "degraded":
-        return "bg-yellow-500";
-      case "offline":
-        return "bg-red-500";
-      case "intermittent":
-        return "bg-orange-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
   // Add this function to handle logs navigation
   const handleViewLogs = () => {
-    navigate(`/logs/${website.id}`, {
+    navigate(`/website-logs/${website.id}`, {
       state: { websiteName: website.website_name },
     });
   };
@@ -153,12 +138,10 @@ export function WebsiteStatusCard({
     <TooltipProvider>
       <Card className={cn(
         "relative overflow-hidden transition-all duration-300 hover:shadow-lg",
-        website.health_status.toLowerCase() === "offline" && "animate-pulse-fast"
+        website.health_status.toLowerCase() === "offline" && "animate-pulse-fast",
+        !isMonitoring && "filter grayscale-[0.7]"
       )}>
-        <div className={cn(
-          "absolute top-0 left-0 w-1 h-full",
-          getStatusColor(website.health_status)
-        )} />
+
         <div
           className={cn(
             "absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-30 blur-2xl pointer-events-none",

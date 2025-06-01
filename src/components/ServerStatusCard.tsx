@@ -74,7 +74,7 @@ export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: S
   };
 
   const handleViewLogs = () => {
-    navigate(`/logs/${server.id}`, {
+    navigate(`/server-logs/${server.id}`, {
       state: { serverName: server.hostname },
     });
   };
@@ -83,12 +83,9 @@ export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: S
     <TooltipProvider>
       <Card className={cn(
         "relative overflow-hidden transition-all duration-300 hover:shadow-lg",
-        server.health_status.toLowerCase() === "offline" && "animate-pulse-fast"
+        server.health_status.toLowerCase() === "offline" && "animate-pulse-fast",
+        !isMonitoring && "filter grayscale-[0.7]"
       )}>
-        <div className={cn(
-          "absolute top-0 left-0 w-1 h-full",
-          getStatusColor(server.health_status)
-        )} />
         <div
           className={cn(
             "absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-30 blur-2xl pointer-events-none",
@@ -238,6 +235,7 @@ export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: S
           </div>
           </div>
 
+          {/* this code has to be retained for now as it might be asked to add during testing */}
           {/* <div className={cn(
             "rounded-md flex items-center justify-end gap-3 duration-300 mt-0"
           )}>

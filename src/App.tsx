@@ -14,6 +14,7 @@ import ProtectedRoute from "./components/ProtectedRoutes";
 import MonitorWebsite from "./components/dashboard/MonitorWebsite";
 import Websites from "./pages/Websites";
 import WebsiteLogs from "./pages/WebsiteLogs";
+import ServerLogs from "./pages/ServerLogs";
 import { WebsiteStatusProvider } from "./contexts/WebsiteStatusContext";
 
 const queryClient = new QueryClient();
@@ -68,10 +69,18 @@ const App = () => (
               }
             />
           <Route
-            path="/logs/:id"
+            path="/website-logs/:id"
             element={
               <ProtectedRoute>
                 <WebsiteLogs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/server-logs/:id"
+            element={
+              <ProtectedRoute>
+                <ServerLogs />
               </ProtectedRoute>
             }
           />

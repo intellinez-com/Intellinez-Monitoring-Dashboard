@@ -3,6 +3,7 @@ import { StatusOverview } from "@/components/dashboard/StatusOverview";
 import { MetricsChart } from "@/components/dashboard/MetricsChart";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useServerMetrics } from "@/hooks/useServerMetrics";
 
 interface MonitoringLog {
   website_id: string;
@@ -15,17 +16,17 @@ interface MonitoringLog {
 
 const Index = () => {
   const [loading, setLoading] = useState(true);
-  const [monitoringData, setMonitoringData] = useState<MonitoringLog[]>([]);
+  const [websiteMonitoringData, setWebsiteMonitoringData] = useState<MonitoringLog[]>([]);
+  const { getChartData, getMetricsConfig } = useServerMetrics();
 
-
-
+  // function for fetching the monitoring data from supabase
   const fetchMonitoringData = async () => {
     try {
       // Calculate timestamp for 1 hour ago
       const oneHourAgo = new Date();
       oneHourAgo.setHours(oneHourAgo.getHours() - 1);
 
-      const { data, error } = await supabase
+      const { data:websitesData, error } = await supabase
         .from("website_monitoring_logs")
         .select(`
           website_id,
@@ -40,7 +41,7 @@ const Index = () => {
       if (error) throw error;
 
       // Transform the data to match our MonitoringLog interface
-      const transformedData = (data || []).map((item: any) => ({
+      const transformedData = (websitesData || []).map((item: any) => ({
         website_id: item.website_id,
         response_time_ms: item.response_time_ms,
         checked_at: item.checked_at,
@@ -49,7 +50,7 @@ const Index = () => {
         }
       }));
 
-      setMonitoringData(transformedData);
+      setWebsiteMonitoringData(transformedData);
     } catch (error) {
       console.error("Error fetching monitoring data:", error);
     } finally {
@@ -57,8 +58,8 @@ const Index = () => {
     }
   };
 
+  // hook for fetching data and setting interval
   useEffect(() => {
-    // Initial fetch
     fetchMonitoringData();
 
     // Set up interval for real-time updates (every 50 seconds)
@@ -69,7 +70,7 @@ const Index = () => {
   }, []);
 
   // Transform monitoring data for the chart
-  const chartData = monitoringData.reduce((acc: any[], log) => {
+  const chartDataForWebsites = websiteMonitoringData.reduce((acc: any[], log) => {
     const timestamp = new Date(log.checked_at).toISOString();
     const existingPoint = acc.find(point => point.timestamp === timestamp);
 
@@ -84,7 +85,6 @@ const Index = () => {
 
     return acc;
   }, []);
-
 
   // Generate and persist a unique color for each website, mapping website name to color
   const getOrGenerateWebsiteColorMap = (websites: string[]): Record<string, string> => {
@@ -166,13 +166,13 @@ const Index = () => {
   };
 
   // Get unique website names from the data
-  const uniqueWebsites = Array.from(new Set(monitoringData.map(log => log.website.website_name)));
+  const uniqueWebsites = Array.from(new Set(websiteMonitoringData.map(log => log.website.website_name)));
 
   // Get or generate the color map
   const websiteColorMap = getOrGenerateWebsiteColorMap(uniqueWebsites);
 
   // Build metrics array for the chart
-  const metrics = uniqueWebsites.map((websiteName) => ({
+  const metricsForWebsites = uniqueWebsites.map((websiteName) => ({
     name: websiteName,
     key: websiteName,
     color: websiteColorMap[websiteName]
@@ -189,13 +189,50 @@ const Index = () => {
         </div>
 
         <StatusOverview />
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-3">
             <MetricsChart
               title="Website Response Times (ms)"
               description="Last hour response time monitoring (updates every 50 seconds)"
-              data={chartData}
-              metrics={metrics}
+              data={chartDataForWebsites}
+              metrics={metricsForWebsites}
+            />
+          </div>
+
+          <div className="lg:col-span-3">
+            <MetricsChart
+              title="Server Response Times (ms)"
+              description="Last hour response time monitoring (updates every 50 seconds)"
+              data={getChartData('response_time_ms')}
+              metrics={getMetricsConfig('response_time_ms')}
+            />
+          </div>
+
+          <div className="lg:col-span-3">
+            <MetricsChart
+              title="CPU Usage (%)"
+              description="Last hour CPU usage monitoring (updates every 50 seconds)"
+              data={getChartData('cpu_percent')}
+              metrics={getMetricsConfig('cpu_percent')}
+            />
+          </div>
+
+          <div className="lg:col-span-3">
+            <MetricsChart
+              title="Memory Usage (%)"
+              description="Last hour memory usage monitoring (updates every 50 seconds)"
+              data={getChartData('memory_percent')}
+              metrics={getMetricsConfig('memory_percent')}
+            />
+          </div>
+
+          <div className="lg:col-span-3">
+            <MetricsChart
+              title="Disk Usage (%)"
+              description="Last hour disk usage monitoring (updates every 50 seconds)"
+              data={getChartData('disk_percent')}
+              metrics={getMetricsConfig('disk_percent')}
             />
           </div>
         </div>

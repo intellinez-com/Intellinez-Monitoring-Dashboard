@@ -150,6 +150,7 @@ export default function ServerLogs() {
           if (b === "all") return 1;
           return a.localeCompare(b);
         });
+        // console.log(combinedStatuses);
         setUniqueHealthStatuses(combinedStatuses);
       }
     } catch (error) {
