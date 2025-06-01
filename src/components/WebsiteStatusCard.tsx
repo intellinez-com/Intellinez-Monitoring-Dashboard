@@ -9,7 +9,7 @@ import {
   Info,
   FileText,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "./ui/card";
 import { cn } from "@/lib/utils";
 import { Website, WebsiteWithSSL } from "@/types/website";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ import {
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useNavigate } from "react-router-dom";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 interface WebsiteStatusCardProps {
   website: WebsiteWithSSL;
@@ -52,7 +54,7 @@ export function WebsiteStatusCard({
 
   // Add this function to handle logs navigation
   const handleViewLogs = () => {
-    navigate(`/logs/${website.id}`, {
+    navigate(`/website-logs/${website.id}`, {
       state: { websiteName: website.website_name },
     });
   };
@@ -134,28 +136,12 @@ export function WebsiteStatusCard({
 
   return (
     <TooltipProvider>
-      <Card
-        className={cn(
-          // Glassmorphism + shadow + border
-          "group relative overflow-hidden rounded-xl border border-border/60 shadow-md transition-all duration-300 hover:scale-[1.025] hover:shadow-2xl",
-          "bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md",
-          website.health_status === "Healthy" && "ring-2 ring-emerald-200/60",
-          website.health_status === "Degraded" && "ring-2 ring-yellow-200/60",
-          website.health_status === "Offline" && "ring-2 ring-red-200/60",
-          website.health_status === "Intermittent" && "ring-2 ring-gray-200/60",
-          !isMonitoring && "filter grayscale-[0.7]"
-        )}
-        style={{
-          boxShadow:
-            website.health_status === "Healthy"
-              ? "0 4px 24px 0 rgba(16,185,129,0.10)"
-              : website.health_status === "Degraded"
-              ? "0 4px 24px 0 rgba(251,191,36,0.10)"
-              : website.health_status === "Intermittent"
-              ? "0 4px 24px 0 rgba(107,114,128,0.10)"
-              : "0 4px 24px 0 rgba(239,68,68,0.10)",
-        }}
-      >
+      <Card className={cn(
+        "relative overflow-hidden transition-all duration-300 hover:shadow-lg",
+        website.health_status.toLowerCase() === "offline" && "animate-pulse-fast",
+        !isMonitoring && "filter grayscale-[0.7]"
+      )}>
+
         <div
           className={cn(
             "absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-30 blur-2xl pointer-events-none",

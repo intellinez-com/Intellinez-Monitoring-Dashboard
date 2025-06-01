@@ -36,16 +36,16 @@ export function WebsiteManager() {
   const [activeFilter, setActiveFilter] = useState<
     "All" | "Healthy" | "Degraded" | "Offline" | "Intermittent"
   >("All");
-  const [is_Monitoring, setIs_Monitoring] = useState(() => {
+  const [is_Monitoring_websites, setis_Monitoring_websites] = useState(() => {
     // Get the stored value on initial load
-    const stored = localStorage.getItem("is_Monitoring");
+    const stored = localStorage.getItem("is_Monitoring_websites");
     return stored ? JSON.parse(stored) : false;
   });
 
   useEffect(() => {
-    // Update localStorage whenever is_Monitoring changes
-    localStorage.setItem("is_Monitoring", JSON.stringify(is_Monitoring));
-  }, [is_Monitoring]);
+    // Update localStorage whenever is_Monitoring_websites changes
+    localStorage.setItem("is_Monitoring_websites", JSON.stringify(is_Monitoring_websites));
+  }, [is_Monitoring_websites]);
 
   const [UpdateformData, setUpdateFormData] = useState({
     name: "",
@@ -383,14 +383,14 @@ export function WebsiteManager() {
   useEffect(() => {
     fetchWebsites(); // Initial load
 
-    if (!is_Monitoring) return; // Only auto-refresh if monitoring is ON
+    if (!is_Monitoring_websites) return; // Only auto-refresh if monitoring is ON
 
     const intervalId = setInterval(() => {
       fetchWebsites();
     }, 55000);
 
     return () => clearInterval(intervalId);
-  }, [userId, is_Monitoring]);
+  }, [userId, is_Monitoring_websites]);
 
   // Add this sorting function before your return statement
   const sortByHealthStatus = (websites: WebsiteWithSSL[]) => {
@@ -523,33 +523,33 @@ export function WebsiteManager() {
     rounded-full border-[2.5px] transition-all duration-500 ease-in-out
     transform hover:scale-102 group relative backdrop-blur-sm
     text-xs
-    ${is_Monitoring
+    ${is_Monitoring_websites
               ? "border-emerald-400/50 bg-gradient-to-r from-emerald-500/90 to-green-400/90 text-white shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:from-emerald-400 hover:to-green-300"
               : "border-zinc-300/50 bg-gradient-to-r from-zinc-100/90 to-slate-50/90 text-zinc-700 shadow-zinc-300/20 hover:shadow-zinc-300/40 hover:from-zinc-200 hover:to-slate-100"}
   `}
-          onClick={() => setIs_Monitoring((prev) => !prev)}
+          onClick={() => setis_Monitoring_websites((prev) => !prev)}
         >
           {/* Glow */}
           <div className={`
     absolute inset-0 rounded-full blur-xl transition-opacity duration-500
-    ${is_Monitoring ? "opacity-40 bg-emerald-400" : "opacity-0 bg-zinc-400"}
+    ${is_Monitoring_websites ? "opacity-40 bg-emerald-400" : "opacity-0 bg-zinc-400"}
   `} />
 
           {/* Toggle */}
           <div className="relative">
             <div className={`
       w-10 h-6 rounded-full transition-all duration-500 flex items-center
-      ${is_Monitoring ? "bg-emerald-400/20 border-white/30" : "bg-zinc-200/50 border-zinc-300/30"}
+      ${is_Monitoring_websites ? "bg-emerald-400/20 border-white/30" : "bg-zinc-200/50 border-zinc-300/30"}
       backdrop-blur-sm border-2
     `}>
               <div className={`
         absolute w-4 h-4 rounded-full shadow-md transition-all duration-500 flex items-center justify-center
-        ${is_Monitoring ? "translate-x-5 bg-white" : "translate-x-1 bg-zinc-400"}
+        ${is_Monitoring_websites ? "translate-x-5 bg-white" : "translate-x-1 bg-zinc-400"}
       `}>
-                <div className={`absolute inset-0 rounded-full ${is_Monitoring ? "animate-ping bg-white/50" : ""}`} />
+                <div className={`absolute inset-0 rounded-full ${is_Monitoring_websites ? "animate-ping bg-white/50" : ""}`} />
                 <div className={`
           w-1.5 h-1.5 rounded-full transition-all duration-500
-          ${is_Monitoring ? "bg-emerald-500 scale-100" : "bg-zinc-500 scale-0"}
+          ${is_Monitoring_websites ? "bg-emerald-500 scale-100" : "bg-zinc-500 scale-0"}
         `} />
               </div>
             </div>
@@ -557,7 +557,7 @@ export function WebsiteManager() {
 
           {/* Text */}
           <span className="relative font-medium tracking-wide text-xs flex items-center gap-2">
-            {is_Monitoring ? (
+            {is_Monitoring_websites ? (
               <>
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                 <span className="animate-gradient-text bg-gradient-to-r from-white to-emerald-100">Monitoring</span>
@@ -569,7 +569,7 @@ export function WebsiteManager() {
 
           {/* Decorative circles */}
           <div className="absolute -z-10 inset-0 overflow-hidden rounded-full">
-            {is_Monitoring && (
+            {is_Monitoring_websites && (
               <>
                 <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-emerald-300/20 blur-md animate-pulse" />
                 <div className="absolute -bottom-3 -left-3 w-6 h-6 rounded-full bg-green-300/20 blur-md animate-pulse delay-100" />
@@ -635,7 +635,7 @@ export function WebsiteManager() {
                 setConfirmOpen(true);
               }}
               onUpdate={() => handleUpdate(website)}
-              isMonitoring={is_Monitoring}
+              isMonitoring={is_Monitoring_websites}
             />
           ))
         )}

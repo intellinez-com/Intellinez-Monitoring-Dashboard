@@ -223,11 +223,11 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
             />
             {focusedMetricKey && (
               <text
-                x="50%"
-                y={30}
+                x="65%"
+                y={20}
                 textAnchor="middle"
                 fill="#333"
-                fontSize={16}
+                fontSize={15}
                 fontWeight="bold"
                 className="select-none"
               >

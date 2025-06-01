@@ -66,7 +66,7 @@ const handleLogout = async () => {
         });
       }
     }
-      localStorage.removeItem('is_Monitoring');
+      localStorage.removeItem('is_Monitoring_websites');
     toast({
       title: "Success",
       description: "Logged Out Successfully",
