@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 
 export function useConnectionStatus(
-  pingUrl = "https://httpbin.org/status/200",
+  pingUrl = "https://www.cloudflare.com/cdn-cgi/trace",
   intervalMs = 30000
 ) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
