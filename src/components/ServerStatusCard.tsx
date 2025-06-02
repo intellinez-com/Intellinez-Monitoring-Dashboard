@@ -1,8 +1,7 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { FileText, Pencil, Trash, Network, Clock, Server, ChevronDown, ChevronUp, Circle } from "lucide-react";
+import { FileText, Trash, Network, Clock, Server, ChevronDown, ChevronUp, Circle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -212,10 +211,23 @@ export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: S
               </TooltipTrigger>
               <TooltipContent>View logs</TooltipContent>
             </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(server.hostname)}
+                  className="h-8 w-8 rounded-full hover:bg-red-100 hover:text-red-700 transition"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
           </div>
           </div>
 
-          {/* this code has to be retained for now as it might be asked to add during testing */}
+          
           {/* <div className={cn(
             "rounded-md flex items-center justify-end gap-3 duration-300 mt-0"
           )}>

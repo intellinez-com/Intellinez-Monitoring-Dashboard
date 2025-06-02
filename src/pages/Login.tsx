@@ -69,7 +69,7 @@ const handleLogin = async () => {
         variant: "success",
       });
     }
-    navigate('/websites');  // or use react-router's navigate
+    navigate('/');  // or use react-router's navigate
   }
   setLoading(false);
 };

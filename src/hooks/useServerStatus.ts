@@ -21,37 +21,41 @@ export const useServerStatus = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCounts = async () => {
-    try {
-      const { data: serverData, error } = await supabase
-        .from("server_metrics")
-        .select("health_status");
+  try {
+    const { data: serverData, error } = await supabase
+      .from("server_metrics")
+      .select("health_status,detected_hostname,ip_address");
 
-      if (error) throw error;
+    if (error) throw error;
 
-      const counts: ServerHealthCounts = {
-        healthy: 0,
-        degraded: 0,
-        offline: 0,
-        intermittent: 0,
-        all: 0,
-      };
+    const counts: ServerHealthCounts = {
+      healthy: 0,
+      degraded: 0,
+      offline: 0,
+      intermittent: 0,
+      all: 0,
+    };
 
-      serverData.forEach((item) => {
-        const status = item.health_status?.toLowerCase();
-        if (status && status in counts) {
-          counts[status as keyof ServerHealthCounts]++;
-        }
-      });
+    // Only count unique detected_hostname
+    const seenIpAddress = new Set<string>();
+    (serverData || []).forEach((item) => {
+      const ip_address = item.ip_address;
+      const status = item.health_status?.toLowerCase();
+      if (ip_address && !seenIpAddress.has(ip_address) && status && status in counts) {
+        counts[status as keyof ServerHealthCounts]++;
+        seenIpAddress.add(ip_address);
+      }
+    });
 
-      counts.all = serverData.length;
-      setData(counts);
-    } catch (error) {
-      console.error("Error fetching server status counts:", error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    counts.all = seenIpAddress.size;
+    setData(counts);
+  } catch (error) {
+    console.error("Error fetching server status counts:", error);
+    setError(error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchCounts();
