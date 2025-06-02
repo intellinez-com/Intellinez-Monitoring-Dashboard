@@ -43,7 +43,8 @@ const generateServerColor = (serverHostname: string): string => {
     "#daa520", // GoldenRod
     "#a0522d", // Sienna
     "#708090", // SlateGray
-    "#000000"  // Black
+    "#ffb6c1", //Lightpink
+    // "#000000"  // Black
   ];
 
   // Helper to check if a color is "dangerous" (red-ish or close to red)

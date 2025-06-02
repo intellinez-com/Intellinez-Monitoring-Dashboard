@@ -27,7 +27,7 @@ export const useWebsitesByStatus = (healthStatus?: string) => {
     setError(null);
 
     try {
-      console.log("Fetching websites with status:", status);
+      // console.log("Fetching websites with status:", status);
       
       let query = supabase
         .from("latest_active_website_data")
@@ -48,8 +48,8 @@ export const useWebsitesByStatus = (healthStatus?: string) => {
 
       if (error) throw error;
 
-      console.log("Raw data from database:", data);
-      console.log("Number of websites fetched:", data?.length || 0);
+      // console.log("Raw data from database:", data);
+      // console.log("Number of websites fetched:", data?.length || 0);
 
       const transformedData = data?.map((website) => ({
         id: website.id,
@@ -71,8 +71,8 @@ export const useWebsitesByStatus = (healthStatus?: string) => {
         domain_expiry: website.domain_expiry || null,
       })) || [];
 
-      console.log("Transformed websites:", transformedData);
-      console.log("Number of transformed websites:", transformedData.length);
+      // console.log("Transformed websites:", transformedData);
+      // console.log("Number of transformed websites:", transformedData.length);
 
       setWebsites(transformedData);
     } catch (error) {

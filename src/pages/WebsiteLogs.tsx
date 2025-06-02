@@ -183,9 +183,9 @@ export default function WebsiteLogs() {
         case '6h':
           return diffInHours <= 6;
         case '12h':
-          return diffInHours <= 24;
+          return diffInHours <= 12;
         case '24h':
-          return diffInHours <= 24 * 7;
+          return diffInHours <= 24;
         default:
           return diffInHours <= 1;
       }
@@ -564,15 +564,19 @@ export default function WebsiteLogs() {
                 </div>
                 <div className="sm:col-span-1">
                   <Label htmlFor="logTimeFilter" className="text-xs font-medium text-muted-foreground">Filter Logs by Time</Label>
-                  <Select value={logTimeFilter} onValueChange={(value) => setLogTimeFilter(value as LogTimeFilterType)}>
+                  <Select value={logTimeFilter} onValueChange={(value) => {
+                    console.log("value changed for logtimefilter ", value);
+                    setLogTimeFilter(value as LogTimeFilterType);
+                    console.log("log time filter ", logTimeFilter);
+                  }}>
                     <SelectTrigger id="logTimeFilter" className="h-9 mt-1">
                       <SelectValue placeholder="Select time range" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1h">Last Hour</SelectItem>
                       <SelectItem value="6h">Last 6 Hours</SelectItem>
-                      <SelectItem value="1d">Last 12 hours</SelectItem>
-                      <SelectItem value="1w">Last 24 hours</SelectItem>
+                      <SelectItem value="12h">Last 12 hours</SelectItem>
+                      <SelectItem value="24h">Last 24 hours</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

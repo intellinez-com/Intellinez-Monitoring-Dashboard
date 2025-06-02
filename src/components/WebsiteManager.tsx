@@ -343,7 +343,7 @@ export function WebsiteManager() {
 
       if (error) throw error;
 
-      console.log("Fetched website monitoring logs:", data);
+      // console.log("Fetched website monitoring logs:", data);
 
       freshData =
         data?.map((website) => ({
@@ -372,7 +372,7 @@ export function WebsiteManager() {
           domain_expiry: website.domain_expiry || null,
         })) || [];
 
-      console.log("Final transformed website data:", freshData);
+      // console.log("Final transformed website data:", freshData);
     } catch (error) {
       console.error("Error fetching websites:", error);
       toast({

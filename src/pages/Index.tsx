@@ -61,12 +61,11 @@ const Index = () => {
   // hook for fetching data and setting interval
   useEffect(() => {
     fetchMonitoringData();
-
-    // Set up interval for real-time updates (every 50 seconds)
-    const intervalId = setInterval(fetchMonitoringData, 50000);
+    // const intervalId = setInterval(fetchMonitoringData, 50000);
+    setInterval(fetchMonitoringData, 50000);
 
     // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
+    // return () => clearInterval(intervalId);
   }, []);
 
   // Transform monitoring data for the chart
@@ -97,6 +96,7 @@ const Index = () => {
 
     // Predefined visually distinct colors
     const colors = [
+      "#ffb6c1", //Lightpink
       "#ee82ee", // Violet
       "#800080", // Purple
       "#ff7f50", // Coral
@@ -113,7 +113,7 @@ const Index = () => {
       "#a0522d", // Sienna
       "#708090", // SlateGray
       "#9932cc", // DarkOrchid
-      "#000000"  // Black
+      // "#000000"  // Black
     ];
 
     // Helper to check if a color is "dangerous" (red-ish or close to red)

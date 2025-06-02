@@ -30,7 +30,7 @@ export function useConnectionStatus(
     };
   }, []);
 
-  // 2️⃣ A reusable ping check with better error handling
+  // A reusable ping check with better error handling
   const checkConnectivity = useCallback(async (): Promise<boolean> => {
     try {
       const controller = new AbortController();
@@ -39,6 +39,7 @@ export function useConnectionStatus(
       const response = await fetch(pingUrl, {
         method: "HEAD",
         cache: "no-cache",
+        mode: "cors",
         signal: controller.signal,
         // Remove no-cors to get actual response status
       });
