@@ -363,7 +363,6 @@ export function WebsiteStatusCard({
           </div>
         </CardContent>
 
-        {/* Footer bar with metrics */}
       </Card>
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
         <DialogContent className="max-w-2xl">
