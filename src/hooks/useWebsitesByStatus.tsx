@@ -1,13 +1,28 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { WebsiteWithSSL } from "@/types/website";
+import { useConnectionStatus } from "./useConnectionStatus";
 
 export const useWebsitesByStatus = (healthStatus?: string) => {
   const [websites, setWebsites] = useState<WebsiteWithSSL[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { checkBeforeApiCall, isOnline, isInitialized } = useConnectionStatus();
 
   const fetchWebsitesByStatus = async (status?: string) => {
+    // Only proceed if initialized
+    if (!isInitialized) {
+      return;
+    }
+
+    // Check connection before making API call
+    const isConnected = await checkBeforeApiCall();
+    if (!isConnected) {
+      setError("No internet connection available");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -69,9 +84,21 @@ export const useWebsitesByStatus = (healthStatus?: string) => {
   };
 
   useEffect(() => {
-    // Always fetch when hook is called, whether status is provided or not
-    fetchWebsitesByStatus(healthStatus);
-  }, [healthStatus]);
+    // Only fetch if initialized and online
+    if (isInitialized && isOnline) {
+      fetchWebsitesByStatus(healthStatus);
+    } else if (isInitialized && !isOnline) {
+      setError("Offline - data fetch skipped");
+      setLoading(false);
+    }
+  }, [healthStatus, isOnline, isInitialized]);
 
-  return { websites, loading, error, refetch: () => fetchWebsitesByStatus(healthStatus) };
+  return { 
+    websites, 
+    loading, 
+    error, 
+    isOnline,
+    isInitialized,
+    refetch: () => fetchWebsitesByStatus(healthStatus) 
+  };
 }; 
