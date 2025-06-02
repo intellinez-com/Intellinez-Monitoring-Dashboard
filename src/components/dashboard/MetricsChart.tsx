@@ -217,7 +217,9 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
                 top: 0,
                 height: '100%',
                 paddingLeft: '10px',
-                color: '#fff'
+                color: '#fff',
+                cursor: 'pointer',
+                userSelect: 'none',
               }}
               onClick={handleLegendClick}
             />

@@ -39,7 +39,7 @@ export function WebsiteStatusCard({
   onUpdate,
   isMonitoring,
 }: WebsiteStatusCardProps) {
-  console.log("Website Status Card Rendered", website);
+  // console.log("Website Status Card Rendered", website);
   const navigate = useNavigate();
 
   const status = website.health_status || "Unknown";
