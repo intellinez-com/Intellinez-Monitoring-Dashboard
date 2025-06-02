@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useMonitoringWithConnectionCheck } from "./useMonitoringWithConnectionCheck";
 
 interface ServerMetricPoint {
   timestamp: string;
@@ -123,13 +124,12 @@ const generateServerColor = (serverHostname: string): string => {
   return color;
 };
 
-export const useServerMetrics = () => {
+export const useServerMetrics = (enableDebugLogging = false) => {
   const [metrics, setMetrics] = useState<ServerMetrics>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [servers, setServers] = useState<{ id: string; hostname: string }[]>([]);
 
-  useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -179,12 +179,22 @@ export const useServerMetrics = () => {
       }
     };
 
-    fetchData();
-    const interval = setInterval(fetchData, 50000); // Update every 50 seconds
+    const { isOnline, isInitialized, executeManually } = useMonitoringWithConnectionCheck(
+    fetchData,
+    { 
+      intervalMs: 50000, // Update every 50 seconds
+      retryAttempts: 2,
+      retryDelayMs: 3000,
+      enableLogging: enableDebugLogging
+    }
+  );
 
-    return () => clearInterval(interval);
-  }, []);
-
+  // Initial data generation on mount (only when initialized)
+  useEffect(() => {
+    if (isInitialized) {
+      fetchData();
+    }
+  }, [isInitialized]);
   // Transform metrics data for charts
   const getChartData = (metricKey: keyof Omit<ServerMetricPoint, 'timestamp' | 'hostname'>) => {
     const chartData: ChartDataPoint[] = [];
@@ -230,7 +240,10 @@ export const useServerMetrics = () => {
   return {
     loading,
     error,
+    isOnline,
+    isInitialized,
     getChartData,
-    getMetricsConfig
+    getMetricsConfig,
+    refetch: executeManually
   };
 };

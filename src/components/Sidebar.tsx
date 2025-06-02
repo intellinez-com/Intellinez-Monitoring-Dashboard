@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ActivitySquare, Monitor, Server, Database, BarChart, Bell, Home, User } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/hooks/useUser";
+import intellinez_logo from "../images/intellinez-logo.svg"
 
 export function Sidebar() {
   const location = useLocation();
@@ -22,11 +23,10 @@ export function Sidebar() {
  const {email} = useUser();
 
   return (
-    <div className="hidden border-r bg-muted/40 sm:flex sm:w-50 sm:flex-col">
-      <div className="flex h-20 items-center px-6">
-        <Link to="/" className="flex items-center gap-2 font-semibold">
-          <ActivitySquare className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold">SystemMonitor</span>
+    <div className="hidden border-r bg-muted/40 sm:flex sm:w-50 sm:flex-col w-52">
+      <div className="flex h-20 items-center justify-center">
+        <Link to="/">
+         <img src={intellinez_logo} className="w-44"/>
         </Link>
       </div>
       <nav className="flex-1 space-y-1 px-4 py-2">
@@ -46,17 +46,17 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
-      <div className="border-t p-4">
+      {/* <div className="border-t p-4">
         <div className="flex items-center gap-3 rounded-md bg-muted/60 px-3 py-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
             <span className="text-sm font-medium"><User/></span>
           </div>
-          <div>
+          {/* <div>
             <p className="text-xs font-medium">Admin User</p>
             <p className="text-xs text-muted-foreground">{email}</p>
-          </div>
+          </div> 
         </div>
-      </div>
+      // </div> */}
     </div>
   );
 }
