@@ -78,6 +78,7 @@ interface ServerMonitoringLog {
 
 type ChartTimeFilterType = '1h' | '6h' | '12h' | '24h';
 type LogTimeFilterType = '1h' | '6h' | '12h' | '24h';
+type MetricType = 'cpu_percent' | 'memory_percent' | 'disk_percent';
 
 export default function ServerLogs() {
   const { id } = useParams();
@@ -85,6 +86,7 @@ export default function ServerLogs() {
   const navigate = useNavigate();
   const [logs, setLogs] = useState<ServerMonitoringLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>('cpu_percent');
 
   const urlParams = new URLSearchParams(location.search);
   const serverName = urlParams.get('name') || location.state?.serverName || "Server";
@@ -134,13 +136,15 @@ export default function ServerLogs() {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from("server_monitoring_logs")
+        .from("server_metrics")
         .select("*")
-        .eq("server_id", id)
+        .eq("hostname", serverName)
         .order("checked_at", { ascending: false });
-
       if (error) throw error;
+      // console.log(`logs data of ${serverName} :  ${data}`);
       setLogs(data || []);
+      // console.log(`data of ${serverName} :  ${logs}`);
+
       setCurrentPage(1);
       if (data) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
@@ -224,16 +228,29 @@ export default function ServerLogs() {
     else if (currentChartTimeFilter === '12h') barThicknessValue = 4;
     else if (currentChartTimeFilter === '24h') barThicknessValue = 2;
 
-    const cpuUsage = chartLogs.map(log => log.cpu_percent || 0);
-    const maxCpuInView = cpuUsage.length > 0 ? Math.max(...cpuUsage) : 0;
-    const baseOffset = Math.max(maxCpuInView * 0.25, 20);
-    const dynamicLineData = cpuUsage.map(cpu => cpu + maxCpuInView * 0.3 + baseOffset);
+    const metricData = chartLogs.map(log => log[selectedMetric] || 0);
+    const maxMetricInView = metricData.length > 0 ? Math.max(...metricData) : 0;
+    const baseOffset = Math.max(maxMetricInView * 0.25, 20);
+    const dynamicLineData = metricData.map(value => value + maxMetricInView * 0.3 + baseOffset);
+
+    const getMetricLabel = () => {
+      switch (selectedMetric) {
+        case 'cpu_percent':
+          return 'CPU Usage (Bars)';
+        case 'memory_percent':
+          return 'Memory Usage (Bars)';
+        case 'disk_percent':
+          return 'Disk Usage (Bars)';
+        default:
+          return 'CPU Usage (Bars)';
+      }
+    };
 
     return {
       labels: chartLogs.map(log => new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })),
       datasets: [{
-        label: 'CPU Usage (Bars)',
-        data: cpuUsage,
+        label: getMetricLabel(),
+        data: metricData,
         backgroundColor: chartLogs.map(log =>
           log.health_status.toLowerCase() === 'healthy'
             ? 'rgb(34, 197, 94)'
@@ -280,7 +297,7 @@ export default function ServerLogs() {
         order: 1
       }]
     };
-  }, [getTimelineChartFilteredLogs]);
+  }, [getTimelineChartFilteredLogs, selectedMetric]);
 
   const chartData = useMemo(() => prepareTimelineChartData(chartTimeFilter), [chartTimeFilter, prepareTimelineChartData]);
 
@@ -458,40 +475,71 @@ export default function ServerLogs() {
             <div className="mb-6">
               <div className="p-4 rounded-lg border bg-card">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-sm font-medium">Resource Usage Timeline</h3>
-                  <div className="flex gap-2 flex-wrap items-center">
-                    <Button
-                      variant={chartTimeFilter === '1h' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setChartTimeFilter('1h')}
-                      className="h-7 text-xs"
-                    >
-                      Last Hour
-                    </Button>
-                    <Button
-                      variant={chartTimeFilter === '6h' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setChartTimeFilter('6h')}
-                      className="h-7 text-xs"
-                    >
-                      6 Hours
-                    </Button>
-                    <Button
-                      variant={chartTimeFilter === '12h' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setChartTimeFilter('12h')}
-                      className="h-7 text-xs"
-                    >
-                      12 Hours
-                    </Button>
-                    <Button
-                      variant={chartTimeFilter === '24h' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setChartTimeFilter('24h')}
-                      className="h-7 text-xs"
-                    >
-                      24 Hours
-                    </Button>
+                 <div className="flex justify-between gap-2 items-center">
+                   <h3 className="text-sm font-medium">Resource Usage Timeline</h3>
+                  <div className="flex items-center space-x-2 pl-2">
+                      <Button
+                        variant={selectedMetric === 'cpu_percent' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedMetric('cpu_percent')}
+                        className="h-7 text-xs"
+                      >
+                        CPU
+                      </Button>
+                      <Button
+                        variant={selectedMetric === 'memory_percent' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedMetric('memory_percent')}
+                        className="h-7 text-xs"
+                      >
+                        Memory
+                      </Button>
+                      <Button
+                        variant={selectedMetric === 'disk_percent' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedMetric('disk_percent')}
+                        className="h-7 text-xs"
+                      >
+                        Disk
+                      </Button>
+                    </div>
+                 </div>
+                  <div className="flex gap-2 flex-wrap items-center ">
+                    
+                    <div className="flex items-center space-x-2 pl-2">
+                      <Button
+                        variant={chartTimeFilter === '1h' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setChartTimeFilter('1h')}
+                        className="h-7 text-xs"
+                      >
+                        Last Hour
+                      </Button>
+                      <Button
+                        variant={chartTimeFilter === '6h' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setChartTimeFilter('6h')}
+                        className="h-7 text-xs"
+                      >
+                        6 Hours
+                      </Button>
+                      <Button
+                        variant={chartTimeFilter === '12h' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setChartTimeFilter('12h')}
+                        className="h-7 text-xs"
+                      >
+                        12 Hours
+                      </Button>
+                      <Button
+                        variant={chartTimeFilter === '24h' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setChartTimeFilter('24h')}
+                        className="h-7 text-xs"
+                      >
+                        24 Hours
+                      </Button>
+                    </div>
                     <div className="flex items-center space-x-2 pl-2">
                       <Switch
                         id="showChartUnhappyOnly"
