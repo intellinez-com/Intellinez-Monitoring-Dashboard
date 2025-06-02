@@ -16,13 +16,24 @@ import Websites from "./pages/Websites";
 import WebsiteLogs from "./pages/WebsiteLogs";
 import ServerLogs from "./pages/ServerLogs";
 import { WebsiteStatusProvider } from "./contexts/WebsiteStatusContext";
+import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { useConnectionNotifications } from "@/hooks/useConnectionNotifications";
+import { ConnectionLost } from "@/components/ConnectionLost";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+
+const App = () => {
+  const { isOnline } = useConnectionStatus();
+  
+  // Initialize centralized connection notifications
+  useConnectionNotifications();
+  
+  return (
   <QueryClientProvider client={queryClient}>
     <WebsiteStatusProvider>
     <TooltipProvider>
+      <ConnectionLost show={!isOnline} />
       <Toaster />
       <Sonner />
       <BrowserRouter>
@@ -107,5 +118,6 @@ const App = () => (
     </WebsiteStatusProvider>
   </QueryClientProvider>
 );
+};
 
 export default App;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useMonitoringWithConnectionCheck } from "./useMonitoringWithConnectionCheck";
 
 interface ServerMetricPoint {
   timestamp: string;
@@ -152,7 +153,7 @@ const generateServerColor = (serverId: string): string => {
   return color;
 };
 
-export const useServerMetrics = () => {
+export const useServerMetrics = (enableDebugLogging = false) => {
   const [metrics, setMetrics] = useState<ServerMetrics>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -164,31 +165,49 @@ export const useServerMetrics = () => {
     { id: "server-3", hostname: "db-server-1" }
   ];
 
-  useEffect(() => {
-    const generateData = () => {
-      try {
-        const newMetrics: ServerMetrics = {};
+  const generateData = async () => {
+    try {
+      setError(null);
+      if (enableDebugLogging) console.log("Generating server metrics data...");
+      
+      const newMetrics: ServerMetrics = {};
+      
+      // Generate data for each server
+      dummyServers.forEach(server => {
+        newMetrics[server.id] = generateServerData(server.id, server.hostname);
+      });
 
-        // Generate data for each server
-        dummyServers.forEach(server => {
-          newMetrics[server.id] = generateServerData(server.id, server.hostname);
-        });
 
-        setMetrics(newMetrics);
-        setError(null);
-      } catch (err) {
-        console.error("Error generating server metrics:", err);
-        setError("Failed to generate server metrics");
-      } finally {
-        setLoading(false);
+      setMetrics(newMetrics);
+      setLoading(false);
+      
+      if (enableDebugLogging) {
+        console.log("Server metrics updated for", Object.keys(newMetrics).length, "servers");
       }
-    };
+    } catch (err) {
+      console.error("Error generating server metrics:", err);
+      setError("Failed to generate server metrics");
+      setLoading(false);
+    }
+  };
 
-    generateData();
-    const interval = setInterval(generateData, 50000); // Update every 50 seconds
+  // Use the new monitoring hook with connection checking
+  const { isOnline, isInitialized, executeManually } = useMonitoringWithConnectionCheck(
+    generateData,
+    { 
+      intervalMs: 50000, // Update every 50 seconds
+      retryAttempts: 2,
+      retryDelayMs: 3000,
+      enableLogging: enableDebugLogging
+    }
+  );
 
-    return () => clearInterval(interval);
-  }, []);
+  // Initial data generation on mount (only when initialized)
+  useEffect(() => {
+    if (isInitialized) {
+      generateData();
+    }
+  }, [isInitialized]);
 
   // Transform metrics data for charts
   const getChartData = (metricKey: keyof Omit<ServerMetricPoint, 'timestamp' | 'server_id' | 'hostname'>) => {
@@ -227,7 +246,10 @@ export const useServerMetrics = () => {
   return {
     loading,
     error,
+    isOnline,
+    isInitialized,
     getChartData,
-    getMetricsConfig
+    getMetricsConfig,
+    refetch: executeManually
   };
 }; 

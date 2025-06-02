@@ -1,6 +1,7 @@
 import { Bell, Search, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ConnectionStatus } from "@/components/ConnectionStatus";
 
 import {
   DropdownMenu,
@@ -87,6 +88,7 @@ const handleLogout = async () => {
     <header className="sticky top-0 z-10 flex h-16 items-center border-b bg-background px-4 md:px-6">
       
       <div className="flex flex-1 items-center justify-end gap-4 md:justify-end">
+        <ConnectionStatus variant="full" />
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
