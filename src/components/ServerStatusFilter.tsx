@@ -82,7 +82,7 @@ export function ServerStatusFilter({
               "ring-red-400",
             activeFilter === filter.value &&
               filter.value === "Intermittent" &&
-              "ring-grey-400",
+              "ring-orange-400",
             activeFilter === filter.value &&
               filter.value === "All" &&
               "ring-zinc-400"

@@ -53,26 +53,6 @@ export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: S
     Intermittent: "text-orange-500"
   }[server.health_status];
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "healthy":
-        return "bg-emerald-500";
-      case "degraded":
-        return "bg-yellow-500";
-      case "offline":
-        return "bg-red-500";
-      case "intermittent":
-        return "bg-orange-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
-
   const handleViewLogs = () => {
     navigate(`/server-logs/${server.id}`, {
       state: { serverName: server.hostname },
