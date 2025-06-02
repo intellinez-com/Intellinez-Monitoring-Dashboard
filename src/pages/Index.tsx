@@ -232,14 +232,14 @@ const Index = () => {
             />
           </div>
 
-          <div className="lg:col-span-3">
+          {/* <div className="lg:col-span-3">
             <MetricsChart
               title="Server Response Times (ms)"
               description="Last hour response time monitoring (updates every 50 seconds)"
               data={getChartData('response_time_ms')}
               metrics={getMetricsConfig('response_time_ms')}
             />
-          </div>
+          </div> */}
 
           <div className="lg:col-span-3">
             <MetricsChart

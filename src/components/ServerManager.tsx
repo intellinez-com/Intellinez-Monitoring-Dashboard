@@ -43,7 +43,7 @@ export function ServerManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
+  const [selectedServerHostname, setSelectedServerHostname] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
@@ -157,7 +157,7 @@ export function ServerManager() {
   };
 
   const confirmDelete = async () => {
-    if (!selectedServerId || isDeleting) return;
+    if (!selectedServerHostname || isDeleting) return;
 
     setIsDeleting(true);
 
@@ -165,12 +165,19 @@ export function ServerManager() {
       const { error } = await supabase
         .from("server_metrics")
         .delete()
-        .eq("id", selectedServerId);
+        .eq("hostname", selectedServerHostname);
 
       if (error) throw error;
-
+      // Remove color mapping from localStorage
+      try {
+        if (selectedServerHostname) {
+          localStorage.removeItem(`server-color-${selectedServerHostname}`);
+        }
+      } catch (e) {
+        // Ignore localStorage errors
+      }
       setServers((servers) =>
-        servers.filter((server) => server.id !== selectedServerId)
+        servers.filter((server) => server.id !== selectedServerHostname)
       );
       toast({
         title: "Success",
@@ -178,7 +185,7 @@ export function ServerManager() {
         variant: "success",
       });
       setConfirmOpen(false);
-      setSelectedServerId(null);
+      setSelectedServerHostname(null);
     } catch (error) {
       toast({
         title: "Error",
@@ -268,8 +275,17 @@ export function ServerManager() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      // Filter for unique detected_hostname
+      const uniqueServers: ServerMetrics[] = [];
+      const seenIpAddress = new Set<string>();
+      (data || []).forEach((server: ServerMetrics) => {
+        if (server.ip_address && !seenIpAddress.has(server.ip_address)) {
+          uniqueServers.push(server);
+          seenIpAddress.add(server.ip_address);
+        }
+      });
 
-      freshData = data || [];
+      freshData = uniqueServers;
     } catch (error) {
       console.error("Error fetching servers:", error);
       toast({
@@ -425,10 +441,9 @@ export function ServerManager() {
             rounded-full border-[2.5px] transition-all duration-500 ease-in-out
             transform hover:scale-102 group relative backdrop-blur-sm
             text-xs
-            ${
-              is_Monitoring_websites
-                ? "border-emerald-400/50 bg-gradient-to-r from-emerald-500/90 to-green-400/90 text-white shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:from-emerald-400 hover:to-green-300"
-                : "border-zinc-300/50 bg-gradient-to-r from-zinc-100/90 to-slate-50/90 text-zinc-700 shadow-zinc-300/20 hover:shadow-zinc-300/40 hover:from-zinc-200 hover:to-slate-100"
+            ${is_Monitoring_websites
+              ? "border-emerald-400/50 bg-gradient-to-r from-emerald-500/90 to-green-400/90 text-white shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:from-emerald-400 hover:to-green-300"
+              : "border-zinc-300/50 bg-gradient-to-r from-zinc-100/90 to-slate-50/90 text-zinc-700 shadow-zinc-300/20 hover:shadow-zinc-300/40 hover:from-zinc-200 hover:to-slate-100"
             }
           `}
           onClick={() => setis_Monitoring_websites((prev) => !prev)}
@@ -446,10 +461,9 @@ export function ServerManager() {
             <div
               className={`
                 w-10 h-6 rounded-full transition-all duration-500 flex items-center
-                ${
-                  is_Monitoring_websites
-                    ? "bg-emerald-400/20 border-white/30"
-                    : "bg-zinc-200/50 border-zinc-300/30"
+                ${is_Monitoring_websites
+                  ? "bg-emerald-400/20 border-white/30"
+                  : "bg-zinc-200/50 border-zinc-300/30"
                 }
                 backdrop-blur-sm border-2
               `}
@@ -461,9 +475,8 @@ export function ServerManager() {
                 `}
               >
                 <div
-                  className={`absolute inset-0 rounded-full ${
-                    is_Monitoring_websites ? "animate-ping bg-white/50" : ""
-                  }`}
+                  className={`absolute inset-0 rounded-full ${is_Monitoring_websites ? "animate-ping bg-white/50" : ""
+                    }`}
                 />
                 <div
                   className={`
@@ -545,10 +558,10 @@ export function ServerManager() {
         ) : (
           combinedFilteredServers.map((server) => (
             <ServerStatusCard
-              key={server.id}
+              key={server.hostname}
               server={server}
               onDelete={() => {
-                setSelectedServerId(server.id);
+                setSelectedServerHostname(server.hostname);
                 setConfirmOpen(true);
               }}
               onUpdate={() => handleUpdate(server)}

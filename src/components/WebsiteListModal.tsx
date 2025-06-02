@@ -24,9 +24,9 @@ export function WebsiteListModal({ isOpen, onClose, status, title }: WebsiteList
   );
 
   // Debug logging
-  console.log("Modal - Status:", status, "Title:", title);
-  console.log("Modal - Websites received:", websites.length);
-  console.log("Modal - Loading:", loading, "Error:", error);
+  // console.log("Modal - Status:", status, "Title:", title);
+  // console.log("Modal - Websites received:", websites.length);
+  // console.log("Modal - Loading:", loading, "Error:", error);
 
   const getStatusIcon = (healthStatus: string) => {
     switch (healthStatus.toLowerCase()) {
