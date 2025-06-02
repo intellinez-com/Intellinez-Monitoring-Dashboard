@@ -50,18 +50,18 @@ export function StatusOverview() {
               icon="warning"
               onClick={() => handleWebsiteCardClick("degraded", "Degraded")}
             />
+             <StatsCard
+              title="Intermittent"
+              value={websiteData.intermittent}
+              icon="intermittent"
+              onClick={() => handleWebsiteCardClick("intermittent", "Intermittent")}
+            />
             <StatsCard
               title="Offline"
               value={websiteData.offline}
               icon="critical"
               onClick={() => handleWebsiteCardClick("offline", "Offline")}
-            />
-            <StatsCard
-              title="Intermittent"
-              value={websiteData.intermittent}
-              icon="warning"
-              onClick={() => handleWebsiteCardClick("intermittent", "Intermittent")}
-            />
+            />           
           </div>
         </div>
 
@@ -85,17 +85,17 @@ export function StatusOverview() {
               icon="warning"
               onClick={() => handleServerCardClick("degraded", "Degraded")}
             />
+             <StatsCard
+              title="Intermittent"
+              value={serverData.intermittent}
+              icon="intermittent"
+              onClick={() => handleServerCardClick("intermittent", "Intermittent")}
+            />
             <StatsCard
               title="Offline"
               value={serverData.offline}
               icon="critical"
               onClick={() => handleServerCardClick("offline", "Offline")}
-            />
-            <StatsCard
-              title="Intermittent"
-              value={serverData.intermittent}
-              icon="warning"
-              onClick={() => handleServerCardClick("intermittent", "Intermittent")}
             />
           </div>
         </div>
