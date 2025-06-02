@@ -22,7 +22,7 @@ export const ConnectionLost: React.FC<Props> = ({ show }) => {
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-[9998]" />
+      <div className="fixed inset-0 bg-black bg-opacity-80 z-[9998]" />
 
       {/* Connection lost banner */}
       <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white text-center p-3 flex items-center justify-center gap-3 shadow-lg">

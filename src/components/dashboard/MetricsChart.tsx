@@ -81,42 +81,42 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
   };
 
   // custom legend renderer {not used for now}
-  const renderCustomLegend = (props: any) => {
-    const { payload } = props;
-    return (
-      <div style={{ padding: '10px', fontSize: 12 }}>
-        {payload.map((entry: any, index: number) => {
-          const isActive = focusedMetricKey === entry.dataKey;
-          return (
-            <div
-              key={`item-${index}`}
-              onClick={() => { handleLegendClick(entry); console.log("clicked"); }}
-              style={{
-                cursor: 'pointer',
-                marginBottom: 6,
-                padding: '4px 8px',
-                borderRadius: '5px',
-                backgroundColor: isActive ? '#e0f7fa' : 'transparent',
-                fontWeight: isActive ? 'bold' : 'normal',
-                color: entry.color,
-              }}
-            >
-              {entry.value}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  // const renderCustomLegend = (props: any) => {
+  //   const { payload } = props;
+  //   return (
+  //     <div style={{ padding: '10px', fontSize: 12 }}>
+  //       {payload.map((entry: any, index: number) => {
+  //         const isActive = focusedMetricKey === entry.dataKey;
+  //         return (
+  //           <div
+  //             key={`item-${index}`}
+  //             onClick={() => { handleLegendClick(entry); console.log("clicked"); }}
+  //             style={{
+  //               cursor: 'pointer',
+  //               marginBottom: 6,
+  //               padding: '4px 8px',
+  //               borderRadius: '5px',
+  //               backgroundColor: isActive ? '#e0f7fa' : 'transparent',
+  //               fontWeight: isActive ? 'bold' : 'normal',
+  //               color: entry.color,
+  //             }}
+  //           >
+  //             {entry.value}
+  //           </div>
+  //         );
+  //       })}
+  //     </div>
+  //   );
+  // };
 
   if (loading) {
     return (
-      <Card>
+      <Card className="bg-slate-800 text-white">
         <CardHeader className="pb-4">
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle>{title}</CardTitle>
-              {description && <CardDescription>{description}</CardDescription>}
+              <CardTitle className="text-white">{title}</CardTitle>
+              {description && <CardDescription className="text-slate-400">{description}</CardDescription>}
             </div>
           </div>
         </CardHeader>
@@ -130,12 +130,12 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
   if (!data || data.length === 0) {
     // setTimeout(()=> setLoading(false),2000);
     return (
-      <Card>
+      <Card className="bg-slate-800 text-white">
         <CardHeader className="pb-4">
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle>{title}</CardTitle>
-              {description && <CardDescription>{description}</CardDescription>}
+              <CardTitle className="text-white">{title}</CardTitle>
+              {description && <CardDescription className="text-slate-400">{description}</CardDescription>}
             </div>
           </div>
         </CardHeader>
@@ -148,17 +148,17 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
   }
 
   return (
-    <Card>
+    <Card className="bg-slate-800 text-white">
       <CardHeader className="pb-4">
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle>{title}</CardTitle>
-            {description && <CardDescription>{description}</CardDescription>}
+            <CardTitle className="text-white">{title}</CardTitle>
+            {description && <CardDescription className="text-slate-400">{description}</CardDescription>}
           </div>
           <div className="flex gap-2">
             <button
               onClick={zoomOut}
-              className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+              className="px-2 py-1 text-sm bg-slate-400 hover:bg-slate-700 text-white rounded"
             >
               Reset Zoom
             </button>
@@ -175,7 +175,7 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
             onMouseUp={zoom}
             onMouseLeave={handleChartMouseLeave}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#888" opacity={0.2} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#444" opacity={0.2} />
             <XAxis
               dataKey="timestamp"
               allowDataOverflow={true}
@@ -184,26 +184,25 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
                 const date = new Date(value);
                 return date.toLocaleTimeString();
               }}
-              tick={{ fontSize: 11 }}
-              style={{ fontSize: 11 }}
+              tick={{ fontSize: 11, fill: '#9ca3af' }}
+              stroke="#4b5563"
             />
             <YAxis
-              tick={{ fontSize: 11 }}
-              style={{ fontSize: 11 }}
+              tick={{ fontSize: 11, fill: '#9ca3af' }}
+              stroke="#4b5563"
             />
             <Tooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload || payload.length === 0) return null;
-                // Only show the hovered line's value (the first in payload)
                 const hovered = payload[0];
                 return (
-                  <div className="bg-slate-900/90 text-white rounded px-3 py-2 shadow text-xs">
+                  <div className="bg-slate-400 text-white rounded px-3 py-2 shadow text-xs border border-slate-700">
                     <div className="font-semibold mb-1">{hovered.name}</div>
                     <div>
-                      <span className="opacity-70">Time:</span> {new Date(label).toLocaleTimeString()}
+                      <span className="text-slate-400">Time:</span> {new Date(label).toLocaleTimeString()}
                     </div>
                     <div>
-                      <span className="opacity-70">Value:</span> {hovered.value}
+                      <span className="text-slate-400">Value:</span> {hovered.value}
                     </div>
                   </div>
                 );
@@ -217,7 +216,8 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
                 left: 0,
                 top: 0,
                 height: '100%',
-                paddingLeft: '10px'
+                paddingLeft: '10px',
+                color: '#fff'
               }}
               onClick={handleLegendClick}
             />
@@ -226,7 +226,7 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
                 x="65%"
                 y={20}
                 textAnchor="middle"
-                fill="#333"
+                fill="#9ca3af"
                 fontSize={15}
                 fontWeight="bold"
                 className="select-none"
@@ -237,7 +237,7 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
               </text>
             )}
             {!metrics && 
-              <span className="text-muted-foreground">No data</span>
+              <span className="text-slate-400">No data</span>
             }
             {[...metrics]
               .sort((a, b) => a.key.localeCompare(b.key))
@@ -266,8 +266,8 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
                 x1={refAreaLeft}
                 x2={refAreaRight}
                 strokeOpacity={0.3}
-                fill="#888"
-                fillOpacity={0.1}
+                fill="#475569"
+                fillOpacity={0.2}
               />
             )}
           </LineChart>
