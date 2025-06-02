@@ -26,7 +26,7 @@ const Index = () => {
       const oneHourAgo = new Date();
       oneHourAgo.setHours(oneHourAgo.getHours() - 1);
 
-      const { data:websitesData, error } = await supabase
+      const { data: websitesData, error } = await supabase
         .from("website_monitoring_logs")
         .select(`
           website_id,
@@ -95,62 +95,94 @@ const Index = () => {
       if (stored) websiteColorMap = JSON.parse(stored);
     } catch { }
 
-    // Helper to check if a color is "dangerous" (red-ish)
-    const isDangerColor = (hex: string) => {
-      // Convert hex to RGB
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      // Heuristic: red is dominant and not much green/blue
-      return r > 180 && g < 100 && b < 100;
-    };
+    // Predefined visually distinct colors
+    const colors = [
+      "#ee82ee", // Violet
+      "#800080", // Purple
+      "#ff7f50", // Coral
+      "#ffff00", // Yellow
+      "#adff2f", // GreenYellow
+      "#228b22", // ForestGreen
+      "#008080", // Teal
+      "#ff1493", // DeepPink
+      "#00ffff", // Cyan
+      "#40e0d0", // Turquoise
+      "#1e90ff", // DodgerBlue
+      "#000080", // Navy
+      "#daa520", // GoldenRod
+      "#a0522d", // Sienna
+      "#708090", // SlateGray
+      "#9932cc", // DarkOrchid
+      "#000000"  // Black
+    ];
 
-    // Helper to generate a unique color not already used and not "danger"
-    const generateUniqueColor = (usedColors: string[]): string => {
-      let color = "";
-      let attempts = 0;
-      const maxAttempts = 200;
-      while (attempts < maxAttempts) {
-        const hue = Math.floor(Math.random() * 360);
-        const saturation = 70;
-        const lightness = 50;
-        const h = hue;
-        const s = saturation / 100;
-        const l = lightness / 100;
-        const c = (1 - Math.abs(2 * l - 1)) * s;
-        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-        const m = l - c / 2;
-        let r = 0, g = 0, b = 0;
-        if (h >= 0 && h < 60) { r = c; g = x; b = 0; }
-        else if (h >= 60 && h < 120) { r = x; g = c; b = 0; }
-        else if (h >= 120 && h < 180) { r = 0; g = c; b = x; }
-        else if (h >= 180 && h < 240) { r = 0; g = x; b = c; }
-        else if (h >= 240 && h < 300) { r = x; g = 0; b = c; }
-        else { r = c; g = 0; b = x; }
-        const toHex = (n: number) => {
-          const hex = Math.round((n + m) * 255).toString(16);
-          return hex.length === 1 ? '0' + hex : hex;
-        };
-        color = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-        if (
-          !usedColors.includes(color) &&
-          !isDangerColor(color)
-        ) break;
-        attempts++;
+    // Helper to check if a color is "dangerous" (red-ish or close to red)
+    const isDangerColor = (hex: string) => {
+      hex = hex.replace(/^#/, "");
+      const r = parseInt(hex.substring(0, 2), 16) / 255;
+      const g = parseInt(hex.substring(2, 4), 16) / 255;
+      const b = parseInt(hex.substring(4, 6), 16) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h = h * 60;
       }
-      // Fallback: if all else fails, pick a safe blue
-      if (isDangerColor(color)) color = "#3498db";
-      return color;
+      const isRedHue = (h >= 340 || h <= 20);
+      const isHighSat = s > 0.5;
+      const isGoodLight = l > 0.2 && l < 0.85;
+      return isRedHue && isHighSat && isGoodLight;
     };
 
     // Assign colors to new websites
     let updated = false;
     const usedColors = Object.values(websiteColorMap);
+
     websites.forEach((website) => {
       if (!websiteColorMap[website]) {
-        const newColor = generateUniqueColor(usedColors);
-        websiteColorMap[website] = newColor;
-        usedColors.push(newColor);
+        // Try to assign an unused color from the array
+        let color = colors.find(c => !usedColors.includes(c));
+        // If all colors are used, generate a new unique, non-danger color
+        if (!color) {
+          let attempts = 0;
+          do {
+            // Generate a random color in HSL, skipping red hues
+            const hue = Math.floor(Math.random() * 360);
+            if ((hue >= 340 && hue <= 360) || (hue >= 0 && hue <= 20)) continue;
+            const saturation = 70;
+            const lightness = 50;
+            const hslColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+            // Convert HSL to hex
+            const tempDiv = document.createElement("div");
+            tempDiv.style.color = hslColor;
+            document.body.appendChild(tempDiv);
+            const rgb = getComputedStyle(tempDiv).color.match(/\d+/g);
+            document.body.removeChild(tempDiv);
+            let hex = "#000000";
+            if (rgb && rgb.length >= 3) {
+              hex =
+                "#" +
+                ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2]))
+                  .toString(16)
+                  .slice(1);
+            }
+            if (!usedColors.includes(hex) && !isDangerColor(hex) && !colors.includes(hex)) {
+              color = hex;
+              break;
+            }
+            attempts++;
+          } while (attempts < 100);
+          // Fallback if all else fails
+          if (!color) color = "#3498db";
+        }
+        websiteColorMap[website] = color;
+        usedColors.push(color);
         updated = true;
       }
     });
@@ -189,7 +221,7 @@ const Index = () => {
         </div>
 
         <StatusOverview />
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-3">
             <MetricsChart

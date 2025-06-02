@@ -187,6 +187,21 @@ export function WebsiteManager() {
 
       if (error) throw error;
 
+      // Remove color mapping from localStorage
+      try {
+        const websiteColorMapRaw = localStorage.getItem("websiteColorMap");
+        if (websiteColorMapRaw) {
+          const websiteColorMap = JSON.parse(websiteColorMapRaw);
+          // Find the website name by id
+          const deletedWebsite = websites.find(site => site.id === selectedWebsiteId);
+          if (deletedWebsite && websiteColorMap[deletedWebsite.website_name]) {
+            delete websiteColorMap[deletedWebsite.website_name];
+            localStorage.setItem("websiteColorMap", JSON.stringify(websiteColorMap));
+          }
+        }
+      } catch (e) {
+        // Ignore localStorage errors
+      }
       setWebsites((websites) =>
         websites.filter((site) => site.id !== selectedWebsiteId)
       );
@@ -195,6 +210,7 @@ export function WebsiteManager() {
         description: "Website deleted successfully",
         variant: "success",
       });
+
       setConfirmOpen(false);
       setSelectedWebsiteId(null);
     } catch (error) {
