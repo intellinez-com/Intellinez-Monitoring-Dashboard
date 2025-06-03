@@ -53,7 +53,7 @@ export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: S
   }[server.health_status];
 
   const handleViewLogs = () => {
-    navigate(`/server-logs/${server.id}`, {
+    navigate(`/server-logs/${server.ip_address}`, {
       state: { serverName: server.hostname },
     });
   };

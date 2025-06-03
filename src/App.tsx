@@ -88,7 +88,7 @@ const App = () => {
             }
           />
           <Route
-            path="/server-logs/:id"
+            path="/server-logs/:ip"
             element={
               <ProtectedRoute>
                 <ServerLogs />
