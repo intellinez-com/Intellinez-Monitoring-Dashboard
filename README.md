@@ -70,8 +70,8 @@ Intellinez Monitoring Dashboard is a modern web application designed to monitor 
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/insight-health-portal.git
-   cd insight-health-portal
+   [git clone https://github.com/intellinez-com/Intellinez-Monitoring-Dashboard.git]
+   cd Intellinez-Monitoring-Dashboard
    ```
 
 2. **Install dependencies**
