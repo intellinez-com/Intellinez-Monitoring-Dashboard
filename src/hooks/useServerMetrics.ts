@@ -4,6 +4,7 @@ import { useMonitoringWithConnectionCheck } from "./useMonitoringWithConnectionC
 
 interface ServerMetricPoint {
   timestamp: string;
+  server_name: string;
   hostname: string;
   cpu_percent: number;
   memory_percent: number;
@@ -20,30 +21,25 @@ interface ChartDataPoint {
 }
 
 // Generate a unique color for a server
-const generateServerColor = (serverHostname: string): string => {
+const generateServerColor = (serverName: string): string => {
   // Try to get existing color from localStorage
-  const storedColor = localStorage.getItem(`server-color-${serverHostname}`);
+  const storedColor = localStorage.getItem(`server-color-${serverName}`);
   if (storedColor) return storedColor;
 
   // Predefined, visually distinct colors
   const colors = [
-    "#ff1493", // DeepPink
-    "#ee82ee", // Violet
     "#9932cc", // DarkOrchid
-    "#800080", // Purple
     "#ff7f50", // Coral
     "#ffff00", // Yellow
     "#adff2f", // GreenYellow
-    "#228b22", // ForestGreen
-    "#008080", // Teal
-    "#00ffff", // Cyan
+    "#00ff00", // Lime
+    "#00ffff", // Aqua/Cyan
     "#40e0d0", // Turquoise
     "#1e90ff", // DodgerBlue
-    "#000080", // Navy
-    "#daa520", // GoldenRod
-    "#a0522d", // Sienna
-    "#708090", // SlateGray
-    "#ffb6c1", //Lightpink
+    "#ff4500", // OrangeRed
+    "#ff6347", // Tomato
+    "#00fa9a", // MediumSpringGreen
+    "#7cfc00"  // LawnGreen
   ];
 
   // Helper to check if a color is "dangerous" (red-ish or close to red)
@@ -120,7 +116,7 @@ const generateServerColor = (serverHostname: string): string => {
   }
 
   // Store the color
-  localStorage.setItem(`server-color-${serverHostname}`, color);
+  localStorage.setItem(`server-color-${serverName}`, color);
   return color;
 };
 
@@ -128,60 +124,63 @@ export const useServerMetrics = (enableDebugLogging = false) => {
   const [metrics, setMetrics] = useState<ServerMetrics>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [servers, setServers] = useState<{ id: string; hostname: string }[]>([]);
+  const [servers, setServers] = useState<{ serverName: string; hostname: string }[]>([]);
 
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Fetch all server metrics
-        const { data, error } = await supabase
-          .from("server_metrics")
-          .select("id,hostname,checked_at,cpu_percent,memory_percent,disk_percent")
-          .order("checked_at", { ascending: true });
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Fetch all server metrics
+      const { data, error } = await supabase
+        .from("server_metrics")
+        .select("id,server_name,hostname,checked_at,cpu_percent,memory_percent,disk_percent")
+        .order("checked_at", { ascending: true });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        // Group by hostname (unique server)
-        const metricsByServer: ServerMetrics = {};
-        const serverList: { id: string; hostname: string }[] = [];
-        const seenHostnames = new Set<string>();
+      // Group by hostname (unique server)
+      const metricsByServer: ServerMetrics = {};
+      const serverList: { serverName: string; hostname: string }[] = [];
+      const seenHostnames = new Set<string>();
+      const seenServerNames = new Set<string>();
 
-        (data || []).forEach((row: any) => {
-          // Use hostname as the unique identifier
-          if (!metricsByServer[row.hostname]) {
-            metricsByServer[row.hostname] = [];
-            if (!seenHostnames.has(row.hostname)) {
-              serverList.push({ id: row.hostname, hostname: row.hostname }); // Use hostname as id
-              seenHostnames.add(row.hostname);
-            }
+      (data || []).forEach((row: any) => {
+        // Use hostname as the unique identifier
+        if (!metricsByServer[row.server_name]) {
+          metricsByServer[row.server_name] = [];
+          // if (!seenHostnames.has(row.hostname)) {
+          //   serverList.push({ name: row.server_name, hostname: row.hostname }); // Use server_name as name
+          //   seenHostnames.add(row.hostname);
+          // }
+          if (!seenServerNames.has(row.server_name)) {
+            serverList.push({ serverName: row.server_name, hostname: row.hostname }); // Use server_name as name
+            seenServerNames.add(row.server_name);
           }
-          metricsByServer[row.hostname].push({
-            timestamp: row.checked_at,
-            hostname: row.hostname,
-            cpu_percent: row.cpu_percent,
-            memory_percent: row.memory_percent,
-            disk_percent: row.disk_percent,
-          });
+        }
+        metricsByServer[row.server_name].push({
+          timestamp: row.checked_at,
+          server_name: row.server_name,
+          hostname: row.hostname,
+          cpu_percent: row.cpu_percent,
+          memory_percent: row.memory_percent,
+          disk_percent: row.disk_percent,
         });
-        // console.log("data:", data);
-        // console.log("metricsbyserver:", metricsByServer);
-        // console.log("serverlist:", serverList);
+      });
 
-        setMetrics(metricsByServer);
-        setServers(serverList);
-        // console.log("metrics", metrics);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching server metrics:", err);
-        setError("Failed to fetch server metrics");
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    const { isOnline, isInitialized, executeManually } = useMonitoringWithConnectionCheck(
+      setMetrics(metricsByServer);
+      setServers(serverList);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching server metrics:", err);
+      setError("Failed to fetch server metrics");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const { isOnline, isInitialized, executeManually } = useMonitoringWithConnectionCheck(
     fetchData,
-    { 
+    {
       intervalMs: 50000, // Update every 50 seconds
       retryAttempts: 2,
       retryDelayMs: 3000,
@@ -195,33 +194,32 @@ export const useServerMetrics = (enableDebugLogging = false) => {
       fetchData();
     }
   }, [isInitialized]);
+  
   // Transform metrics data for charts
-  const getChartData = (metricKey: keyof Omit<ServerMetricPoint, 'timestamp' | 'hostname'>) => {
+  const getChartData = (metricKey: keyof Omit<ServerMetricPoint, 'timestamp' | 'server_name' | 'hostname'>): ChartDataPoint[] => {
     const chartData: ChartDataPoint[] = [];
 
-    // Collect all unique timestamps across all servers
+    // Step 1: Collect all unique timestamps
     const allTimestampsSet = new Set<string>();
-    Object.values(metrics).forEach(points => {
-      points.forEach(point => {
+    Object.values(metrics).forEach((points) => {
+      points.forEach((point) => {
         allTimestampsSet.add(point.timestamp);
       });
     });
-    // Sort timestamps chronologically
+
     const allTimestamps = Array.from(allTimestampsSet).sort();
 
-    // For each timestamp, collect the metric for each server (by hostname)
-    allTimestamps.forEach(timestamp => {
+    // Step 2: Build chart data grouped by timestamp
+    allTimestamps.forEach((timestamp) => {
       const dataPoint: ChartDataPoint = { timestamp };
-      Object.entries(metrics).forEach(([hostname, points]) => {
-        // Find the metric entry for this timestamp for this server
-        const point = points.find(p => p.timestamp === timestamp);
+
+      Object.entries(metrics).forEach(([server_name, points]) => {
+        const point = points.find((p) => p.timestamp === timestamp);
         if (point) {
-          dataPoint[hostname] = point[metricKey];
-        } else {
-          // Optionally, you can set null or 0 if no data for this timestamp
-          // dataPoint[hostname] = null;
+          dataPoint[server_name] = point[metricKey];
         }
       });
+
       chartData.push(dataPoint);
     });
 
@@ -229,11 +227,11 @@ export const useServerMetrics = (enableDebugLogging = false) => {
   };
 
   // Get metrics configuration for charts
-  const getMetricsConfig = (metricKey: keyof Omit<ServerMetricPoint, 'timestamp' | 'hostname'>) => {
+  const getMetricsConfig = (metricKey: keyof Omit<ServerMetricPoint, 'timestamp' | 'server_name' | 'hostname'>) => {
     return servers.map(server => ({
-      name: server.hostname,
-      key: server.hostname,
-      color: generateServerColor(server.hostname)
+      name: server.serverName,               // For legend/display
+      key: server.serverName,                // For identifying series in chart
+      color: generateServerColor(server.serverName),
     }));
   };
 

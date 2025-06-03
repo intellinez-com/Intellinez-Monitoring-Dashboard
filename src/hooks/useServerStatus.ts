@@ -22,10 +22,8 @@ export const useServerStatus = () => {
 
   const fetchCounts = async () => {
   try {
-    const { data: serverData, error } = await supabase
-      .from("server_metrics")
-      .select("health_status,detected_hostname,ip_address");
-
+    const { data: serverData, error } = await supabase.rpc("get_latest_unique_servers");
+    // console.log(serverData);
     if (error) throw error;
 
     const counts: ServerHealthCounts = {
@@ -37,17 +35,24 @@ export const useServerStatus = () => {
     };
 
     // Only count unique detected_hostname
-    const seenIpAddress = new Set<string>();
+    // const seenIpAddress = new Set<string>();
+    const seenServerNames = new Set<string>();
     (serverData || []).forEach((item) => {
-      const ip_address = item.ip_address;
+      // const ip_address = item.ip_address;
+      const server_name = item.server_name;
       const status = item.health_status?.toLowerCase();
-      if (ip_address && !seenIpAddress.has(ip_address) && status && status in counts) {
+      // if (ip_address && !seenIpAddress.has(ip_address) && status && status in counts) {
+      //   counts[status as keyof ServerHealthCounts]++;
+      //   seenIpAddress.add(ip_address);
+      // }
+      if (server_name && !seenServerNames.has(server_name) && status && status in counts) {
         counts[status as keyof ServerHealthCounts]++;
-        seenIpAddress.add(ip_address);
+        seenServerNames.add(server_name);
       }
     });
 
-    counts.all = seenIpAddress.size;
+    // counts.all = seenIpAddress.size;
+    counts.all = seenServerNames.size;
     setData(counts);
   } catch (error) {
     console.error("Error fetching server status counts:", error);
