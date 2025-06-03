@@ -19,6 +19,7 @@ import { WebsiteStatusProvider } from "./contexts/WebsiteStatusContext";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { useConnectionNotifications } from "@/hooks/useConnectionNotifications";
 import { ConnectionLost } from "@/components/ConnectionLost";
+import { SessionProvider } from "./contexts/SessionContext";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => {
   
   return (
   <QueryClientProvider client={queryClient}>
+    <SessionProvider>
     <WebsiteStatusProvider>
     <TooltipProvider>
       <ConnectionLost show={!isOnline} />
@@ -116,6 +118,7 @@ const App = () => {
       </BrowserRouter>
     </TooltipProvider>
     </WebsiteStatusProvider>
+    </SessionProvider>
   </QueryClientProvider>
 );
 };
