@@ -27,25 +27,19 @@ const generateServerColor = (serverHostname: string): string => {
 
   // Predefined, visually distinct colors
   const colors = [
-    "#ff1493", // DeepPink
-    "#ee82ee", // Violet
-    "#9932cc", // DarkOrchid
-    "#800080", // Purple
-    "#ff7f50", // Coral
-    "#ffff00", // Yellow
-    "#adff2f", // GreenYellow
-    "#228b22", // ForestGreen
-    "#008080", // Teal
-    "#00ffff", // Cyan
-    "#40e0d0", // Turquoise
-    "#1e90ff", // DodgerBlue
-    "#000080", // Navy
-    "#daa520", // GoldenRod
-    "#a0522d", // Sienna
-    "#708090", // SlateGray
-    "#ffb6c1", //Lightpink
-    // "#000000"  // Black
-  ];
+  "#9932cc", // DarkOrchid
+  "#ff7f50", // Coral
+  "#ffff00", // Yellow
+  "#adff2f", // GreenYellow
+  "#00ff00", // Lime
+  "#00ffff", // Aqua/Cyan
+  "#40e0d0", // Turquoise
+  "#1e90ff", // DodgerBlue
+  "#ff4500", // OrangeRed
+  "#ff6347", // Tomato
+  "#00fa9a", // MediumSpringGreen
+  "#7cfc00"  // LawnGreen
+];
 
   // Helper to check if a color is "dangerous" (red-ish or close to red)
   const isDangerColor = (hex: string) => {
