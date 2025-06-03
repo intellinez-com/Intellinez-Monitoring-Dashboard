@@ -1,9 +1,10 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusOverview } from "@/components/dashboard/StatusOverview";
 import { MetricsChart } from "@/components/dashboard/MetricsChart";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useServerMetrics } from "@/hooks/useServerMetrics";
+import { debounce } from "lodash";
 
 interface MonitoringLog {
   website_id: string;
@@ -14,77 +15,7 @@ interface MonitoringLog {
   };
 }
 
-const Index = () => {
-  const [loading, setLoading] = useState(true);
-  const [websiteMonitoringData, setWebsiteMonitoringData] = useState<MonitoringLog[]>([]);
-  const { getChartData, getMetricsConfig } = useServerMetrics();
-
-  // function for fetching the monitoring data from supabase
-  const fetchMonitoringData = async () => {
-    try {
-      // Calculate timestamp for 1 hour ago
-      const oneHourAgo = new Date();
-      oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-
-      const { data: websitesData, error } = await supabase
-        .from("website_monitoring_logs")
-        .select(`
-          website_id,
-          response_time_ms,
-          checked_at,
-          website:websites!inner(website_name,is_active)
-        `)
-        .gte('checked_at', oneHourAgo.toISOString())
-        .eq('websites.is_active', true)
-        .order('checked_at', { ascending: true });
-
-      if (error) throw error;
-
-      // Transform the data to match our MonitoringLog interface
-      const transformedData = (websitesData || []).map((item: any) => ({
-        website_id: item.website_id,
-        response_time_ms: item.response_time_ms,
-        checked_at: item.checked_at,
-        website: {
-          website_name: item.website.website_name
-        }
-      }));
-
-      setWebsiteMonitoringData(transformedData);
-    } catch (error) {
-      console.error("Error fetching monitoring data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // hook for fetching data and setting interval
-  useEffect(() => {
-    fetchMonitoringData();
-    const intervalId = setInterval(fetchMonitoringData, 50000);
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
-  }, []);
-
-  // Transform monitoring data for the chart
-  const chartDataForWebsites = websiteMonitoringData.reduce((acc: any[], log) => {
-    const timestamp = new Date(log.checked_at).toISOString();
-    const existingPoint = acc.find(point => point.timestamp === timestamp);
-
-    if (existingPoint) {
-      existingPoint[log.website.website_name] = log.response_time_ms;
-    } else {
-      acc.push({
-        timestamp,
-        [log.website.website_name]: log.response_time_ms
-      });
-    }
-
-    return acc;
-  }, []);
-
-  // Generate and persist a unique color for each website, mapping website name to color
+// Helper function to generate or get website colors
   const getOrGenerateWebsiteColorMap = (websites: string[]): Record<string, string> => {
     // Load existing map from localStorage
     let websiteColorMap: Record<string, string> = {};
@@ -112,7 +43,6 @@ const Index = () => {
       "#a0522d", // Sienna
       "#708090", // SlateGray
       "#9932cc", // DarkOrchid
-      // "#000000"  // Black
     ];
 
     // Helper to check if a color is "dangerous" (red-ish or close to red)
@@ -141,17 +71,16 @@ const Index = () => {
 
     // Assign colors to new websites
     let updated = false;
-    const usedColors = Object.values(websiteColorMap);
+  const usedColors = new Set(Object.values(websiteColorMap));
 
     websites.forEach((website) => {
       if (!websiteColorMap[website]) {
         // Try to assign an unused color from the array
-        let color = colors.find(c => !usedColors.includes(c));
+      let color = colors.find(c => !usedColors.has(c));
         // If all colors are used, generate a new unique, non-danger color
         if (!color) {
           let attempts = 0;
           do {
-            // Generate a random color in HSL, skipping red hues
             const hue = Math.floor(Math.random() * 360);
             if ((hue >= 340 && hue <= 360) || (hue >= 0 && hue <= 20)) continue;
             const saturation = 70;
@@ -165,13 +94,11 @@ const Index = () => {
             document.body.removeChild(tempDiv);
             let hex = "#000000";
             if (rgb && rgb.length >= 3) {
-              hex =
-                "#" +
-                ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2]))
+            hex = "#" + ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2]))
                   .toString(16)
                   .slice(1);
             }
-            if (!usedColors.includes(hex) && !isDangerColor(hex) && !colors.includes(hex)) {
+          if (!usedColors.has(hex) && !isDangerColor(hex) && !colors.includes(hex)) {
               color = hex;
               break;
             }
@@ -181,7 +108,7 @@ const Index = () => {
           if (!color) color = "#3498db";
         }
         websiteColorMap[website] = color;
-        usedColors.push(color);
+      usedColors.add(color);
         updated = true;
       }
     });
@@ -196,18 +123,102 @@ const Index = () => {
     return websiteColorMap;
   };
 
-  // Get unique website names from the data
-  const uniqueWebsites = Array.from(new Set(websiteMonitoringData.map(log => log.website.website_name)));
+const Index = () => {
+  const [loading, setLoading] = useState(true);
+  const [websiteMonitoringData, setWebsiteMonitoringData] = useState<MonitoringLog[]>([]);
+  const { getChartData, getMetricsConfig } = useServerMetrics();
 
-  // Get or generate the color map
-  const websiteColorMap = getOrGenerateWebsiteColorMap(uniqueWebsites);
+  // Memoize the fetch function to prevent unnecessary recreations
+  const fetchMonitoringData = useCallback(async () => {
+    try {
+      const oneHourAgo = new Date();
+      oneHourAgo.setHours(oneHourAgo.getHours() - 1);
 
-  // Build metrics array for the chart
-  const metricsForWebsites = uniqueWebsites.map((websiteName) => ({
+      const { data: websitesData, error } = await supabase
+        .from("website_monitoring_logs")
+        .select(`
+          website_id,
+          response_time_ms,
+          checked_at,
+          website:websites!inner(website_name,is_active)
+        `)
+        .gte('checked_at', oneHourAgo.toISOString())
+        .eq('websites.is_active', true)
+        .order('checked_at', { ascending: true });
+
+      if (error) throw error;
+
+      const transformedData = (websitesData || []).map((item: any) => ({
+        website_id: item.website_id,
+        response_time_ms: item.response_time_ms,
+        checked_at: item.checked_at,
+        website: {
+          website_name: item.website.website_name
+        }
+      }));
+
+      setWebsiteMonitoringData(transformedData);
+    } catch (error) {
+      console.error("Error fetching monitoring data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Debounce the fetch function to prevent too frequent updates
+  const debouncedFetch = useMemo(
+    () => debounce(fetchMonitoringData, 1000, { leading: true, trailing: true }),
+    [fetchMonitoringData]
+  );
+
+  useEffect(() => {
+    debouncedFetch();
+    const intervalId = setInterval(debouncedFetch, 50000);
+
+    return () => {
+      clearInterval(intervalId);
+      debouncedFetch.cancel();
+    };
+  }, [debouncedFetch]);
+
+  // Memoize the chart data transformation
+  const chartDataForWebsites = useMemo(() => {
+    return websiteMonitoringData.reduce((acc: any[], log) => {
+      const timestamp = new Date(log.checked_at).toISOString();
+      const existingPoint = acc.find(point => point.timestamp === timestamp);
+
+      if (existingPoint) {
+        existingPoint[log.website.website_name] = log.response_time_ms;
+      } else {
+        acc.push({
+          timestamp,
+          [log.website.website_name]: log.response_time_ms
+        });
+      }
+
+      return acc;
+    }, []);
+  }, [websiteMonitoringData]);
+
+  // Memoize the website color map
+  const websiteColorMap = useMemo(() => {
+    const uniqueWebsites = Array.from(
+      new Set(websiteMonitoringData.map(log => log.website.website_name))
+    );
+    return getOrGenerateWebsiteColorMap(uniqueWebsites);
+  }, [websiteMonitoringData]);
+
+  // Memoize metrics array
+  const metricsForWebsites = useMemo(() => {
+    const uniqueWebsites = Array.from(
+      new Set(websiteMonitoringData.map(log => log.website.website_name))
+    );
+    return uniqueWebsites.map((websiteName) => ({
     name: websiteName,
     key: websiteName,
     color: websiteColorMap[websiteName]
   }));
+  }, [websiteMonitoringData, websiteColorMap]);
 
   return (
     <DashboardLayout>
