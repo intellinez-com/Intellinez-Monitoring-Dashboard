@@ -13,7 +13,7 @@ import {
 } from "./ui/tooltip";
 
 interface ServerMetrics {
-  id: string;
+  server_name: string;
   hostname: string;
   detected_hostname: string | null;
   ip_address: string;
@@ -37,11 +37,10 @@ interface ServerMetrics {
 interface ServerStatusCardProps {
   server: ServerMetrics;
   onDelete: (id: string) => void;
-  onUpdate: (server: ServerMetrics) => void;
   isMonitoring: boolean;
 }
 
-export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: ServerStatusCardProps) {
+export function ServerStatusCard({ server, onDelete, isMonitoring }: ServerStatusCardProps) {
   const navigate = useNavigate();
   const [showMetrics, setShowMetrics] = useState(false);
 
@@ -54,7 +53,7 @@ export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: S
 
   const handleViewLogs = () => {
     navigate(`/server-logs/${server.ip_address}`, {
-      state: { serverName: server.hostname },
+      state: { serverName: server.server_name },
     });
   };
 
@@ -89,7 +88,7 @@ export function ServerStatusCard({ server, onDelete, onUpdate, isMonitoring }: S
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-2">
                 <CardTitle className="font-semibold text-xl tracking-tight truncate text-zinc-800 dark:text-zinc-100">
-                  {server.hostname}
+                  {server.server_name}
                 </CardTitle>
               </div>
               <div className="flex items-center gap-2 group/url">

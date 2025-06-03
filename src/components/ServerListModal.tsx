@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useServersByStatus } from "@/hooks/useServersByStatus";
 import { CircleCheck, CircleAlert, Circle, Activity, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-
+import { useNavigate } from "react-router-dom";
 interface ServerListModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,10 +19,11 @@ interface ServerListModalProps {
 }
 
 export function ServerListModal({ isOpen, onClose, status, title }: ServerListModalProps) {
+  const navigate = useNavigate();
   const { servers, loading, error } = useServersByStatus(
     status === "all" ? "all" : status.charAt(0).toUpperCase() + status.slice(1)
   );
-
+  // console.log(servers);
   const getStatusIcon = (healthStatus: string) => {
     switch (healthStatus.toLowerCase()) {
       case "healthy":
@@ -52,6 +53,14 @@ export function ServerListModal({ isOpen, onClose, status, title }: ServerListMo
         return "bg-gray-50 text-gray-700 border-gray-200";
     }
   };
+
+
+  const handleViewLogs = (server) => {
+    navigate(`/server-logs/${server.ip_address}`, {
+      state: { serverName: server.server_name },
+    });
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -92,17 +101,21 @@ export function ServerListModal({ isOpen, onClose, status, title }: ServerListMo
                   >
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-3">
-                        <h3 className="font-medium text-sm">{server.hostname}</h3>
+                        <h3 className="font-medium text-sm">{server.server_name}</h3>
                         <p className="text-xs text-muted-foreground">
-                        IP: {server.ip_address}
-                      </p>
-                        <Badge 
+                          IP: {server.ip_address}
+                        </p>
+                        <Badge
                           variant="outline"
                           className={cn("text-xs", getStatusColor(server.health_status))}
                         >
                           {server.health_status}
                         </Badge>
                       </div>
+                      {/* <h3 className="font-medium text-sm">{server.hostname}</h3> */}
+                      <p className="text-xs text-muted-foreground">
+                        Hostname: {server.hostname}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         OS: {server.os}
                       </p>
@@ -123,12 +136,11 @@ export function ServerListModal({ isOpen, onClose, status, title }: ServerListMo
                         size="sm"
                         asChild
                         className="h-8 w-8 p-0"
+                        onClick={() => { handleViewLogs(server) }}
                       >
-                        <a
-                          href={`/server-logs/${server.id}?name=${encodeURIComponent(server.hostname)}`}
-                          title="Go to Logs"
-                        >
-                          <FileText className="h-4 w-4" />
+                        <a href='' title="Go to Logs" >
+                        {/*navigate(`/server-logs/${server.ip_address}`, {state: { serverName: server.server_name },});*/}
+                        <FileText className="h-4 w-4" />
                         </a>
                       </Button>
                     </div>

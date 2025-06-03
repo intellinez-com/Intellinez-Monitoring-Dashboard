@@ -61,11 +61,10 @@ const Index = () => {
   // hook for fetching data and setting interval
   useEffect(() => {
     fetchMonitoringData();
-    // const intervalId = setInterval(fetchMonitoringData, 50000);
-    setInterval(fetchMonitoringData, 50000);
+    const intervalId = setInterval(fetchMonitoringData, 50000);
 
     // Cleanup interval on component unmount
-    // return () => clearInterval(intervalId);
+    return () => clearInterval(intervalId);
   }, []);
 
   // Transform monitoring data for the chart
