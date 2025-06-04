@@ -3,128 +3,138 @@ import { useEffect, useState, useCallback, useRef } from "react";
 
 export function useConnectionStatus(
   pingUrl = "https://www.cloudflare.com/cdn-cgi/trace",
-  intervalMs = 30000
+  intervalMs = 30000 // Default to 30 seconds for ping interval
 ) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const previousOnlineState = useRef<boolean | null>(null);
 
-  // 1️⃣ Instant "offline" if browser event fires
+  const isOnlineRef = useRef(isOnline);
+  const isInitializedRef = useRef(isInitialized);
+  const previousOnlineStateRef = useRef<boolean | null>(isOnline);
+
+  // Update refs when their corresponding state changes
   useEffect(() => {
-    const handleOffline = () => {
-      setIsOnline(false);
-      setLastChecked(new Date());
-    };
-    const handleOnline = () => {
-      // We'll double-check with a ping (in case "online" is flaky)
-      checkConnectivity();
-    };
+    isOnlineRef.current = isOnline;
+  }, [isOnline]);
 
-    window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleOnline);
+  useEffect(() => {
+    isInitializedRef.current = isInitialized;
+  }, [isInitialized]);
 
-    return () => {
-      window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleOnline);
-    };
-  }, []);
-
-  // A reusable ping check with better error handling
-  const checkConnectivity = useCallback(async (): Promise<boolean> => {
+  const stableCheckConnectivity = useCallback(async (): Promise<boolean> => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout for the ping
 
       const response = await fetch(pingUrl, {
         method: "HEAD",
         cache: "no-cache",
         mode: "cors",
         signal: controller.signal,
-        // Remove no-cors to get actual response status
       });
-
       clearTimeout(timeoutId);
+
+      const newOnlineStatus = response.ok;
       
-      const wasOnline = isOnline;
-      
-      if (response.ok) {
-        setIsOnline(true);
-        setLastChecked(new Date());
-        
-        if (!isInitialized) {
-          setIsInitialized(true);
-        }
-        
-        // Track state transition
-        previousOnlineState.current = true;
-        return true;
-      } else {
-        setIsOnline(false);
-        setLastChecked(new Date());
-        
-        if (!isInitialized) {
-          setIsInitialized(true);
-        }
-        
-        // Track state transition
-        previousOnlineState.current = false;
-        return false;
+      // Only update state if it actually changed to prevent unnecessary re-renders
+      if (newOnlineStatus !== isOnlineRef.current) {
+        setIsOnline(newOnlineStatus);
       }
-    } catch (error) {
-      console.warn("Connection check failed:", error);
-      setIsOnline(false);
-      setLastChecked(new Date());
       
-      if (!isInitialized) {
+      setLastChecked(new Date());
+
+      if (!isInitializedRef.current) {
         setIsInitialized(true);
       }
-      
-      // Track state transition
-      previousOnlineState.current = false;
+      return newOnlineStatus;
+    } catch (error) {
+      // console.warn("Connection check failed:", error); // Log sparingly
+      if (isOnlineRef.current) { // Only update state if it changed
+        setIsOnline(false);
+      }
+      setLastChecked(new Date());
+      if (!isInitializedRef.current) {
+        setIsInitialized(true);
+      }
       return false;
     }
-  }, [pingUrl, isOnline, isInitialized]);
+  }, [pingUrl]); // Depends only on pingUrl, so it's stable
 
-  // 3️⃣ Check connection before making API calls
-  const checkBeforeApiCall = useCallback(async (): Promise<boolean> => {
-    // If we recently checked (less than 10 seconds ago) and were online, assume still online
-    if (lastChecked && isOnline && Date.now() - lastChecked.getTime() < 10000) {
+  const handleOfflineEvent = useCallback(() => {
+    if (isOnlineRef.current) { // Check against ref to prevent race conditions
+        setIsOnline(false);
+        setLastChecked(new Date());
+    }
+  }, []);
+
+  const handleOnlineEvent = useCallback(() => {
+    // When browser merely reports online, always verify with a real check
+    stableCheckConnectivity();
+  }, [stableCheckConnectivity]);
+
+  useEffect(() => {
+    window.addEventListener("offline", handleOfflineEvent);
+    window.addEventListener("online", handleOnlineEvent);
+    return () => {
+      window.removeEventListener("offline", handleOfflineEvent);
+      window.removeEventListener("online", handleOnlineEvent);
+    };
+  }, [handleOfflineEvent, handleOnlineEvent]);
+
+  // Initial connectivity check on mount if not yet initialized
+  useEffect(() => {
+    if (!isInitializedRef.current) {
+      stableCheckConnectivity();
+    }
+  }, [stableCheckConnectivity]);
+
+  // Periodic connectivity check
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | undefined;
+    if (isInitializedRef.current) { // Start interval only after the first check (initialization)
+      intervalId = setInterval(stableCheckConnectivity, intervalMs);
+    }
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+    // Re-run if isInitialized changes (e.g. after the first check) or if intervalMs changes (though unlikely)
+  }, [isInitialized, intervalMs, stableCheckConnectivity]);
+  
+  const stableCheckBeforeApiCall = useCallback(async (): Promise<boolean> => {
+    if (isOnlineRef.current && lastChecked && Date.now() - lastChecked.getTime() < 10000) { // 10s grace period
       return true;
     }
-    
-    // Otherwise, do a fresh check
-    return await checkConnectivity();
-  }, [checkConnectivity, isOnline, lastChecked]);
+    return await stableCheckConnectivity();
+  }, [lastChecked, stableCheckConnectivity]); // Depends on lastChecked (state) and stableCheckConnectivity (stable)
 
-  // 4️⃣ Get connection transition info
   const getConnectionTransition = useCallback(() => {
-    const wasOnline = previousOnlineState.current;
-    const isCurrentlyOnline = isOnline;
-    
+    const wasOnline = previousOnlineStateRef.current;
+    const isCurrentlyOnline = isOnlineRef.current;
     return {
-      justWentOffline: wasOnline === true && !isCurrentlyOnline && isInitialized,
-      justWentOnline: wasOnline === false && isCurrentlyOnline && isInitialized,
-      isInitialized
+      justWentOffline: wasOnline === true && !isCurrentlyOnline && isInitializedRef.current,
+      justWentOnline: wasOnline === false && isCurrentlyOnline && isInitializedRef.current,
+      isInitialized: isInitializedRef.current,
     };
-  }, [isOnline, isInitialized]);
+  }, []); // This callback is stable as it only relies on refs
 
-  // 5️⃣ Periodic ping every intervalMs to catch "silent" drops
+  // Update previousOnlineStateRef *after* isOnline state has possibly changed
   useEffect(() => {
-    const intervalId = setInterval(checkConnectivity, intervalMs);
-    // Run one immediately on mount
-    checkConnectivity();
+    // This effect runs after the render where `isOnline` might have changed.
+    // `previousOnlineStateRef` will store the value of `isOnline` from this render,
+    // making it the "previous" value for the *next* render's `getConnectionTransition`.
+    previousOnlineStateRef.current = isOnline;
+  }, [isOnline]);
 
-    return () => clearInterval(intervalId);
-  }, [checkConnectivity, intervalMs]);
-
-  return { 
-    isOnline, 
-    checkConnectivity, 
-    checkBeforeApiCall,
-    setIsOnline,
+  return {
+    isOnline,
+    checkConnectivity: stableCheckConnectivity, // Expose the stable version
+    checkBeforeApiCall: stableCheckBeforeApiCall, // Expose the stable version
+    setIsOnline, // If external control is needed
     lastChecked,
     isInitialized,
-    getConnectionTransition
+    getConnectionTransition,
   };
 }

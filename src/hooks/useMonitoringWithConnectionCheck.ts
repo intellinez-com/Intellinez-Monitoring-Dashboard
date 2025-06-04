@@ -15,7 +15,7 @@ export const useMonitoringWithConnectionCheck = (
   const {
     intervalMs = 60000, // Default 1 minute
     retryAttempts = 3,
-    retryDelayMs = 5000, // 5 seconds
+    retryDelayMs = 20000, // 5 seconds
     enableLogging = false,
   } = config;
 
@@ -24,7 +24,7 @@ export const useMonitoringWithConnectionCheck = (
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMonitoringRef = useRef(false);
   const retryCountRef = useRef(0);
-
+  
   const [wasOffline, setWasOffline] = useState(false); // Track previous offline state
 
   const executeWithConnectionCheck = useCallback(async () => {
@@ -88,7 +88,7 @@ export const useMonitoringWithConnectionCheck = (
       if (enableLogging) console.log("Starting monitoring - connection is online");
       setTimeout(() => {
         executeWithConnectionCheck();
-      }, 5000);
+      }, 100);
 
       intervalRef.current = setInterval(executeWithConnectionCheck, intervalMs);
     } else {
