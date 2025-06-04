@@ -21,7 +21,7 @@ interface ServerListModalProps {
 export function ServerListModal({ isOpen, onClose, status, title }: ServerListModalProps) {
   const navigate = useNavigate();
   const { servers, loading, error } = useServersByStatus(
-    status === "all" ? "all" : status.charAt(0).toUpperCase() + status.slice(1)
+    status === "all" ? "" : status.charAt(0).toUpperCase() + status.slice(1)
   );
   // console.log(servers);
   const getStatusIcon = (healthStatus: string) => {
