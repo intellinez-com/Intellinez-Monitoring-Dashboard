@@ -78,7 +78,7 @@ const generateServerColor = (serverName: string): string => {
 
   // Find an unused color
   let color = colors.find(c => !usedColors.has(c));
-  
+
   if (!color) {
     // Generate a new color if all predefined colors are used
     let attempts = 0;
@@ -88,19 +88,19 @@ const generateServerColor = (serverName: string): string => {
       const saturation = 70;
       const lightness = 50;
       const hslColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-      
+
       // Convert HSL to hex
       const tempDiv = document.createElement("div");
       tempDiv.style.color = hslColor;
       document.body.appendChild(tempDiv);
       const rgb = getComputedStyle(tempDiv).color.match(/\d+/g);
       document.body.removeChild(tempDiv);
-      
+
       if (rgb && rgb.length >= 3) {
         const hex = "#" + ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2]))
           .toString(16)
           .slice(1);
-        
+
         if (!usedColors.has(hex) && !isDangerColor(hex) && !colors.includes(hex)) {
           color = hex;
           break;
@@ -124,48 +124,44 @@ export const useServerMetrics = (enableDebugLogging = false) => {
   const [error, setError] = useState<string | null>(null);
   const [servers, setServers] = useState<{ serverName: string; hostname: string }[]>([]);
 
-    const fetchData = useCallback(async () => {
-      setLoading(true);
-      try {
-        // Fetch all server metrics
-       const { data, error } = await supabase
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch all server metrics
+      const { data, error } = await supabase
         .from("server_metrics")
         .select("id,server_name,hostname,checked_at,cpu_percent,memory_percent,disk_percent")
         .order("checked_at", { ascending: true });
 
       if (error) throw error;
 
-// Process data in chunks to avoid long-running synchronous operations
-      const chunkSize = 100;         const metricsByServer: ServerMetrics = {};
+      // Process data in chunks to avoid long-running synchronous operations
+      const chunkSize = 100; const metricsByServer: ServerMetrics = {};
       const serverList: { serverName: string; hostname: string }[] = [];
       const seenHostnames = new Set<string>();
       const seenServerNames = new Set<string>();
 
-        for (let i = 0; i < (data?.length || 0); i += chunkSize) {
+      for (let i = 0; i < (data?.length || 0); i += chunkSize) {
         const chunk = data?.slice(i, i + chunkSize) || [];
-        
+
         chunk.forEach((row: any) => {
-         if (!metricsByServer[row.server_name]) {
-          metricsByServer[row.server_name] = [];
-          // if (!seenHostnames.has(row.hostname)) {
-          //   serverList.push({ name: row.server_name, hostname: row.hostname }); // Use server_name as name
-          //   seenHostnames.add(row.hostname);
-          // }
-          if (!seenServerNames.has(row.server_name)) {
-            serverList.push({ serverName: row.server_name, hostname: row.hostname }); // Use server_name as name
-            seenServerNames.add(row.server_name);
+          if (!metricsByServer[row.server_name]) {
+            metricsByServer[row.server_name] = [];
+            if (!seenServerNames.has(row.server_name)) {
+              serverList.push({ serverName: row.server_name, hostname: row.hostname }); // Use server_name as name
+              seenServerNames.add(row.server_name);
+            }
           }
-          }
-        metricsByServer[row.server_name].push({
-          timestamp: row.checked_at,
-          server_name: row.server_name,
-          hostname: row.hostname,
-          cpu_percent: row.cpu_percent,
-          memory_percent: row.memory_percent,
-          disk_percent: row.disk_percent,
+          metricsByServer[row.server_name].push({
+            timestamp: row.checked_at,
+            server_name: row.server_name,
+            hostname: row.hostname,
+            cpu_percent: row.cpu_percent,
+            memory_percent: row.memory_percent,
+            disk_percent: row.disk_percent,
+          });
         });
-      });
-       // Allow other tasks to run between chunks
+        // Allow other tasks to run between chunks
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       setMetrics(metricsByServer);
@@ -195,7 +191,7 @@ export const useServerMetrics = (enableDebugLogging = false) => {
     }
   }, [isInitialized, fetchData]);
 
-  const getChartData = useCallback((metricKey: keyof Omit<ServerMetricPoint, 'timestamp'| 'server_name'  | 'hostname'>) => {
+  const getChartData = useCallback((metricKey: keyof Omit<ServerMetricPoint, 'timestamp' | 'server_name' | 'hostname'>) => {
     const chartData: ChartDataPoint[] = [];
 
     // Step 1: Collect all unique timestamps
@@ -226,7 +222,7 @@ export const useServerMetrics = (enableDebugLogging = false) => {
   }, [metrics]);
 
   // Get metrics configuration for charts
-  const getMetricsConfig = useCallback((metricKey: keyof Omit<ServerMetricPoint, 'timestamp'| 'server_name' | 'hostname'>) => {
+  const getMetricsConfig = useCallback((metricKey: keyof Omit<ServerMetricPoint, 'timestamp' | 'server_name' | 'hostname'>) => {
     return servers.map(server => ({
       name: server.serverName,               // For legend/display
       key: server.serverName,                // For identifying series in chart

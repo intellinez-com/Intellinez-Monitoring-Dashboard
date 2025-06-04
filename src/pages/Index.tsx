@@ -239,23 +239,23 @@ const Index = () => {
   }, [websiteMonitoringData, websiteColorMap]);
 
 
-  useEffect(() => {
-    // Helper to update all chart data and metrics configs
-    const updateAllMetrics = () => {
-      setChartDataForServerCPUPercent(getChartData('cpu_percent'));
-      setChartDataForServerMemoryPercent(getChartData('memory_percent'));
-      setChartDataForServerDiskPercent(getChartData('disk_percent'));
-      setMetricsForServerCPU(getMetricsConfig('cpu_percent'));
-      setMetricsForServerMemory(getMetricsConfig('memory_percent'));
-      setMetricsForServerDisk(getMetricsConfig('disk_percent'));
-    };
+  // useEffect(() => {
+  //   // Helper to update all chart data and metrics configs
+  //   const updateAllMetrics = () => {
+  //     setChartDataForServerCPUPercent(getChartData('cpu_percent'));
+  //     setChartDataForServerMemoryPercent(getChartData('memory_percent'));
+  //     setChartDataForServerDiskPercent(getChartData('disk_percent'));
+  //     setMetricsForServerCPU(getMetricsConfig('cpu_percent'));
+  //     setMetricsForServerMemory(getMetricsConfig('memory_percent'));
+  //     setMetricsForServerDisk(getMetricsConfig('disk_percent'));
+  //   };
 
-    updateAllMetrics(); // Initial call
+  //   updateAllMetrics(); // Initial call
 
-    const intervalId = setInterval(updateAllMetrics, 50000);
+  //   const intervalId = setInterval(updateAllMetrics, 50000);
 
-    return () => clearInterval(intervalId);
-  }, [loading]);
+  //   return () => clearInterval(intervalId);
+  // }, [loading]);
 
   return (
     <DashboardLayout>
@@ -292,8 +292,8 @@ const Index = () => {
             <MetricsChart
               title="CPU Usage (%)"
               description="Last hour CPU usage monitoring (updates every 50 seconds)"
-              data={chartDataForServerCPUPercent}
-              metrics={metricsForServerCPU}
+              data={getChartData('cpu_percent')}
+              metrics={getMetricsConfig('cpu_percent')}
             />
           </div>
 
@@ -301,8 +301,8 @@ const Index = () => {
             <MetricsChart
               title="Memory Usage (%)"
               description="Last hour memory usage monitoring (updates every 50 seconds)"
-              data={chartDataForServerMemoryPercent}
-              metrics={metricsForServerMemory}
+              data={getChartData('memory_percent')}
+              metrics={getMetricsConfig('memory_percent')}
             />
           </div>
 
@@ -310,8 +310,8 @@ const Index = () => {
             <MetricsChart
               title="Disk Usage (%)"
               description="Last hour disk usage monitoring (updates every 50 seconds)"
-              data={chartDataForServerDiskPercent}
-              metrics={metricsForServerDisk}
+              data={getChartData('disk_percent')}
+              metrics={getMetricsConfig('disk_percent')}
             />
           </div>
         </div>
