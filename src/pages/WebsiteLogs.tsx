@@ -15,7 +15,7 @@ import {
   Timer,
   AlertCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +31,8 @@ import {
   LineElement,
   PointElement,
   LineController,
-  ChartData
-} from 'chart.js';
+  ChartData,
+} from "chart.js";
 import {
   Select,
   SelectContent,
@@ -40,10 +40,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input"
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Chart } from 'react-chartjs-2';
+import { Chart } from "react-chartjs-2";
 
 ChartJS.register(
   CategoryScale,
@@ -72,8 +72,8 @@ interface MonitoringLog {
   User_Id: string | null;
 }
 
-type ChartTimeFilterType = '1h' | '6h' | '12h' | '24h';
-type LogTimeFilterType = '1h' | '6h' | '12h' | '24h';
+type ChartTimeFilterType = "1h" | "6h" | "12h" | "24h";
+type LogTimeFilterType = "1h" | "6h" | "12h" | "24h";
 
 export default function WebsiteLogs() {
   const { id } = useParams();
@@ -88,16 +88,22 @@ export default function WebsiteLogs() {
   const [isLoading, setIsLoading] = useState(true);
 
   const urlParams = new URLSearchParams(location.search);
-  const websiteName = urlParams.get('name') || location.state?.websiteName || "Website";
+  const websiteName =
+    urlParams.get("name") || location.state?.websiteName || "Website";
 
-  const [chartTimeFilter, setChartTimeFilter] = useState<ChartTimeFilterType>('1h');
-  const [logTimeFilter, setLogTimeFilter] = useState<LogTimeFilterType>('1h');
-  const [showChartUnhappyOnly, setShowChartUnhappyOnly] = useState<boolean>(false);
+  const [chartTimeFilter, setChartTimeFilter] =
+    useState<ChartTimeFilterType>("1h");
+  const [logTimeFilter, setLogTimeFilter] = useState<LogTimeFilterType>("1h");
+  const [showChartUnhappyOnly, setShowChartUnhappyOnly] =
+    useState<boolean>(false);
 
-  const [selectedHealthStatus, setSelectedHealthStatus] = useState<string>("all");
+  const [selectedHealthStatus, setSelectedHealthStatus] =
+    useState<string>("all");
   const [showErrorsOnly, setShowErrorsOnly] = useState<boolean>(false);
 
-  const [uniqueHealthStatuses, setUniqueHealthStatuses] = useState<string[]>([]);
+  const [uniqueHealthStatuses, setUniqueHealthStatuses] = useState<string[]>(
+    []
+  );
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(20);
@@ -109,10 +115,17 @@ export default function WebsiteLogs() {
       const now = new Date();
       let hoursAgo = 1;
       switch (chartTimeFilter) {
-        case '6h': hoursAgo = 6; break;
-        case '12h': hoursAgo = 12; break;
-        case '24h': hoursAgo = 24; break;
-        default: hoursAgo = 1;
+        case "6h":
+          hoursAgo = 6;
+          break;
+        case "12h":
+          hoursAgo = 12;
+          break;
+        case "24h":
+          hoursAgo = 24;
+          break;
+        default:
+          hoursAgo = 1;
       }
       const startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
 
@@ -139,10 +152,17 @@ export default function WebsiteLogs() {
       const now = new Date();
       let hoursAgo = 1;
       switch (logTimeFilter) {
-        case '6h': hoursAgo = 6; break;
-        case '12h': hoursAgo = 12; break;
-        case '24h': hoursAgo = 24; break;
-        default: hoursAgo = 1;
+        case "6h":
+          hoursAgo = 6;
+          break;
+        case "12h":
+          hoursAgo = 12;
+          break;
+        case "24h":
+          hoursAgo = 24;
+          break;
+        default:
+          hoursAgo = 1;
       }
       let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
       let endTime = now;
@@ -167,8 +187,12 @@ export default function WebsiteLogs() {
 
       if (data) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
-        const statusesFromLogs = Array.from(new Set(data.map(log => log.health_status))).sort();
-        const combinedStatuses = Array.from(new Set(["all", ...predefinedStatuses, ...statusesFromLogs])).sort((a, b) => {
+        const statusesFromLogs = Array.from(
+          new Set(data.map((log) => log.health_status))
+        ).sort();
+        const combinedStatuses = Array.from(
+          new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
+        ).sort((a, b) => {
           if (a === "all") return -1;
           if (b === "all") return 1;
           return a.localeCompare(b);
@@ -196,7 +220,9 @@ export default function WebsiteLogs() {
   const getTimelineChartFilteredLogs = useCallback(() => {
     let chartFiltered = chartLogs;
     if (showChartUnhappyOnly) {
-      chartFiltered = chartFiltered.filter(log => log.health_status.toLowerCase() !== 'healthy');
+      chartFiltered = chartFiltered.filter(
+        (log) => log.health_status.toLowerCase() !== "healthy"
+      );
     }
     return chartFiltered;
   }, [chartLogs, showChartUnhappyOnly]);
@@ -207,14 +233,17 @@ export default function WebsiteLogs() {
 
     // Health status filter
     if (selectedHealthStatus !== "all") {
-      filtered = filtered.filter(log => log.health_status === selectedHealthStatus);
+      filtered = filtered.filter(
+        (log) => log.health_status === selectedHealthStatus
+      );
     }
 
     // Apply show errors only filter (modified logic)
     if (showErrorsOnly) {
-      filtered = filtered.filter(log => 
-        log.health_status?.toLowerCase() !== 'healthy' || 
-        (log.status_code !== null && log.status_code !== 200)
+      filtered = filtered.filter(
+        (log) =>
+          log.health_status?.toLowerCase() !== "healthy" ||
+          (log.status_code !== null && log.status_code !== 200)
       );
     }
 
@@ -231,7 +260,7 @@ export default function WebsiteLogs() {
       totalCount: filtered.length,
       totalPages: Math.ceil(filtered.length / itemsPerPage),
       hasNext: endIndex < filtered.length,
-      hasPrev: currentPage > 1
+      hasPrev: currentPage > 1,
     };
   }, [getFilteredLogs, currentPage, itemsPerPage]);
 
@@ -241,92 +270,111 @@ export default function WebsiteLogs() {
   }, [logTimeFilter, selectedHealthStatus, showErrorsOnly]);
 
   // Chart data preparation
-  const prepareTimelineChartData = useCallback((currentChartTimeFilter: ChartTimeFilterType): ChartData<'bar' | 'line', number[], string> => {
-    const filteredLogs = getTimelineChartFilteredLogs();
-    const sortedLogs = [...filteredLogs].sort((a, b) =>
-      new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()
-    );
-    const chartLogs = sortedLogs;
+  const prepareTimelineChartData = useCallback(
+    (
+      currentChartTimeFilter: ChartTimeFilterType
+    ): ChartData<"bar" | "line", number[], string> => {
+      const filteredLogs = getTimelineChartFilteredLogs();
+      const sortedLogs = [...filteredLogs].sort(
+        (a, b) =>
+          new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()
+      );
+      const chartLogs = sortedLogs;
 
-    let barThicknessValue = 8;
-    if (currentChartTimeFilter === '6h') barThicknessValue = 6;
-    else if (currentChartTimeFilter === '12h') barThicknessValue = 4;
-    else if (currentChartTimeFilter === '24h') barThicknessValue = 2;
+      let barThicknessValue = 8;
+      if (currentChartTimeFilter === "6h") barThicknessValue = 6;
+      else if (currentChartTimeFilter === "12h") barThicknessValue = 4;
+      else if (currentChartTimeFilter === "24h") barThicknessValue = 2;
 
-    const responseTimes = chartLogs.map(log => log.response_time_ms || 0);
-    const maxResponseTimeInView = responseTimes.length > 0 ? Math.max(...responseTimes) : 0;
-    const baseOffset = Math.max(maxResponseTimeInView * 0.25, 20);
-    const dynamicLineData = responseTimes.map(rt => rt + maxResponseTimeInView * 0.3 + baseOffset);
+      const responseTimes = chartLogs.map((log) => log.response_time_ms || 0);
+      const maxResponseTimeInView =
+        responseTimes.length > 0 ? Math.max(...responseTimes) : 0;
+      const baseOffset = Math.max(maxResponseTimeInView * 0.25, 20);
+      const dynamicLineData = responseTimes.map(
+        (rt) => rt + maxResponseTimeInView * 0.3 + baseOffset
+      );
 
-    return {
-      labels: chartLogs.map(log => new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })),
-      datasets: [{
-        label: 'Response Time (Bars)',
-        data: responseTimes,
-        backgroundColor: chartLogs.map(log =>
-          log.health_status.toLowerCase() === 'healthy'
-            ? 'rgb(34, 197, 94)'
-            : 'rgb(239, 68, 68)'
+      return {
+        labels: chartLogs.map((log) =>
+          new Date(log.checked_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
         ),
-        borderColor: chartLogs.map(log =>
-          log.health_status.toLowerCase() === 'healthy'
-            ? 'rgb(34, 197, 94)'
-            : 'rgb(239, 68, 68)'
-        ),
-        borderWidth: 1,
-        borderRadius: 4,
-        barThickness: barThicknessValue,
-        order: 2
-      },
-      {
-        type: 'line' as const,
-        label: 'Trend Line',
-        data: dynamicLineData,
-        borderColor: 'rgb(100, 100, 100)',
-        borderWidth: 2.5,
-        pointBackgroundColor: chartLogs.map(log =>
-          log.health_status.toLowerCase() !== 'healthy'
-            ? 'rgb(255, 0, 0)'
-            : 'transparent'
-        ),
-        pointBorderColor: chartLogs.map(log =>
-          log.health_status.toLowerCase() !== 'healthy'
-            ? 'rgb(255,0,0)'
-            : 'transparent'
-        ),
-        pointRadius: chartLogs.map(log =>
-          log.health_status.toLowerCase() !== 'healthy'
-            ? 5
-            : 0
-        ),
-        pointHoverRadius: chartLogs.map(log =>
-          log.health_status.toLowerCase() !== 'healthy'
-            ? 7
-            : 0
-        ),
-        fill: false,
-        tension: 0.3,
-        order: 1
-      }]
-    };
-  }, [getTimelineChartFilteredLogs]);
+        datasets: [
+          {
+            label: "Response Time (Bars)",
+            data: responseTimes,
+            backgroundColor: chartLogs.map((log) =>
+              log.health_status.toLowerCase() === "healthy"
+                ? "rgb(34, 197, 94)"
+                : "rgb(239, 68, 68)"
+            ),
+            borderColor: chartLogs.map((log) =>
+              log.health_status.toLowerCase() === "healthy"
+                ? "rgb(34, 197, 94)"
+                : "rgb(239, 68, 68)"
+            ),
+            borderWidth: 1,
+            borderRadius: 4,
+            barThickness: barThicknessValue,
+            order: 2,
+          },
+          {
+            type: "line" as const,
+            label: "Trend Line",
+            data: dynamicLineData,
+            borderColor: "rgb(100, 100, 100)",
+            borderWidth: 2.5,
+            pointBackgroundColor: chartLogs.map((log) =>
+              log.health_status.toLowerCase() !== "healthy"
+                ? "rgb(255, 0, 0)"
+                : "transparent"
+            ),
+            pointBorderColor: chartLogs.map((log) =>
+              log.health_status.toLowerCase() !== "healthy"
+                ? "rgb(255,0,0)"
+                : "transparent"
+            ),
+            pointRadius: chartLogs.map((log) =>
+              log.health_status.toLowerCase() !== "healthy" ? 5 : 0
+            ),
+            pointHoverRadius: chartLogs.map((log) =>
+              log.health_status.toLowerCase() !== "healthy" ? 7 : 0
+            ),
+            fill: false,
+            tension: 0.3,
+            order: 1,
+          },
+        ],
+      };
+    },
+    [getTimelineChartFilteredLogs]
+  );
 
-  const chartData = useMemo(() => prepareTimelineChartData(chartTimeFilter),
-    [chartTimeFilter, prepareTimelineChartData]);
+  const chartData = useMemo(
+    () => prepareTimelineChartData(chartTimeFilter),
+    [chartTimeFilter, prepareTimelineChartData]
+  );
 
   const timelineChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false
+        display: false,
       },
       tooltip: {
         callbacks: {
           title: (tooltipItems: any) => {
             const index = tooltipItems[0].dataIndex;
             const logsForTooltip = getTimelineChartFilteredLogs();
-            const sortedLogs = [...logsForTooltip].sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
+            const sortedLogs = [...logsForTooltip].sort(
+              (a, b) =>
+                new Date(a.checked_at).getTime() -
+                new Date(b.checked_at).getTime()
+            );
             const log = sortedLogs[index];
             if (log && log.checked_at) {
               return new Date(log.checked_at).toLocaleString();
@@ -336,45 +384,49 @@ export default function WebsiteLogs() {
           label: (context: any) => {
             const index = context.dataIndex;
             const logsForTooltip = getTimelineChartFilteredLogs();
-            const sortedLogs = [...logsForTooltip].sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
+            const sortedLogs = [...logsForTooltip].sort(
+              (a, b) =>
+                new Date(a.checked_at).getTime() -
+                new Date(b.checked_at).getTime()
+            );
             const log = sortedLogs[index];
             if (log) {
               return [
                 `Response Time: ${log.response_time_ms || 0}ms`,
                 `Status: ${log.health_status}`,
-                `Status Code: ${log.status_code || 'N/A'}`
+                `Status Code: ${log.status_code || "N/A"}`,
               ];
             }
             return [];
-          }
-        }
-      }
+          },
+        },
+      },
     },
     scales: {
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
+          color: "rgba(0, 0, 0, 0.1)",
         },
         ticks: {
-          callback: (value: number) => `${value}ms`
+          callback: (value: number) => `${value}ms`,
         },
         border: {
-          display: false
-        }
+          display: false,
+        },
       },
       x: {
         grid: {
-          display: false
+          display: false,
         },
         ticks: {
-          display: false
+          display: false,
         },
         border: {
-          display: false
-        }
-      }
-    }
+          display: false,
+        },
+      },
+    },
   };
 
   const noDataForChart = getTimelineChartFilteredLogs().length === 0;
@@ -386,32 +438,37 @@ export default function WebsiteLogs() {
       "Status Code",
       "Response Time (ms)",
       "Error Message",
-      "Created At"
+      "Created At",
     ];
 
-    const csvData = logs.map(log => [
+    const csvData = logs.map((log) => [
       new Date(log.checked_at).toLocaleString(),
       log.health_status,
       log.status_code || "N/A",
       log.response_time_ms || "N/A",
       log.error_message || "None",
-      new Date(log.created_at).toLocaleString()
+      new Date(log.created_at).toLocaleString(),
     ]);
 
     const csvContent = [
       headers.join(","),
-      ...csvData.map(row => row.map(cell =>
-        typeof cell === 'string' && cell.includes(",")
-          ? `"${cell}"`
-          : cell
-      ).join(","))
+      ...csvData.map((row) =>
+        row
+          .map((cell) =>
+            typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
+          )
+          .join(",")
+      ),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `${websiteName.replace(/\s+/g, '_')}_monitoring_logs.csv`);
+    link.setAttribute(
+      "download",
+      `${websiteName.replace(/\s+/g, "_")}_monitoring_logs.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -444,6 +501,16 @@ export default function WebsiteLogs() {
     setLogTimeFilter("1h");
     setSelectedHealthStatus("all");
   };
+  
+    const maxDate = useMemo(() => {
+    return new Date().toISOString().split("T")[0]; // Today
+  }, []);
+  
+  const minDate = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30); // 30 days ago
+    return date.toISOString().split("T")[0];
+  }, []);
 
   return (
     <DashboardLayout>
@@ -460,7 +527,10 @@ export default function WebsiteLogs() {
               Back
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">{websiteName}<span className="text-2xl font-semibold"> Monitoring Logs</span></h1>
+              <h1 className="text-3xl font-bold">
+                {websiteName}
+                <span className="text-2xl font-semibold"> Monitoring Logs</span>
+              </h1>
             </div>
           </div>
           <div className="flex gap-2">
@@ -477,12 +547,15 @@ export default function WebsiteLogs() {
               variant="outline"
               size="sm"
               onClick={() => {
-                fetchChartData(); fetchLogsData();
+                fetchChartData();
+                fetchLogsData();
               }}
               disabled={isLoading}
               className="gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
@@ -496,36 +569,42 @@ export default function WebsiteLogs() {
             <div className="mb-6">
               <div className="p-4 rounded-lg border bg-card">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-sm font-medium">Response Time Timeline</h3>
+                  <h3 className="text-sm font-medium">
+                    Response Time Timeline
+                  </h3>
                   <div className="flex gap-2 flex-wrap items-center">
                     <Button
-                      variant={chartTimeFilter === '1h' ? 'default' : 'outline'}
+                      variant={chartTimeFilter === "1h" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setChartTimeFilter('1h')}
+                      onClick={() => setChartTimeFilter("1h")}
                       className="h-7 text-xs"
                     >
                       Last Hour
                     </Button>
                     <Button
-                      variant={chartTimeFilter === '6h' ? 'default' : 'outline'}
+                      variant={chartTimeFilter === "6h" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setChartTimeFilter('6h')}
+                      onClick={() => setChartTimeFilter("6h")}
                       className="h-7 text-xs"
                     >
                       6 Hours
                     </Button>
                     <Button
-                      variant={chartTimeFilter === '12h' ? 'default' : 'outline'}
+                      variant={
+                        chartTimeFilter === "12h" ? "default" : "outline"
+                      }
                       size="sm"
-                      onClick={() => setChartTimeFilter('12h')}
+                      onClick={() => setChartTimeFilter("12h")}
                       className="h-7 text-xs"
                     >
                       12 Hours
                     </Button>
                     <Button
-                      variant={chartTimeFilter === '24h' ? 'default' : 'outline'}
+                      variant={
+                        chartTimeFilter === "24h" ? "default" : "outline"
+                      }
                       size="sm"
-                      onClick={() => setChartTimeFilter('24h')}
+                      onClick={() => setChartTimeFilter("24h")}
                       className="h-7 text-xs"
                     >
                       24 Hours
@@ -536,7 +615,10 @@ export default function WebsiteLogs() {
                         checked={showChartUnhappyOnly}
                         onCheckedChange={setShowChartUnhappyOnly}
                       />
-                      <Label htmlFor="showChartUnhappyOnly" className="text-xs text-muted-foreground">
+                      <Label
+                        htmlFor="showChartUnhappyOnly"
+                        className="text-xs text-muted-foreground"
+                      >
                         Show Errors Only
                       </Label>
                     </div>
@@ -544,7 +626,7 @@ export default function WebsiteLogs() {
                 </div>
                 <div className="h-[120px] w-full">
                   <Chart
-                    type='bar'
+                    type="bar"
                     data={chartData}
                     options={timelineChartOptions}
                   />
@@ -558,15 +640,24 @@ export default function WebsiteLogs() {
             </div>
 
             <div className="px-1 py-4 border-t border-b">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
-                <div className="sm:col-span-1">
-                  <Label htmlFor="healthStatusFilter" className="text-xs font-medium text-muted-foreground">Filter by Health Status</Label>
-                  <Select value={selectedHealthStatus} onValueChange={setSelectedHealthStatus}>
-                    <SelectTrigger id="healthStatusFilter" className="h-9 mt-1">
+              <div className="flex items-center justify-between gap-4 items-center">
+                <div className="flex items-center justify-between gap-5">
+                  <div className="sm:col-span-1">
+                  <Label
+                    htmlFor="healthStatusFilter"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    Filter by Health Status
+                  </Label>
+                  <Select
+                    value={selectedHealthStatus}
+                    onValueChange={setSelectedHealthStatus}
+                  >
+                    <SelectTrigger id="healthStatusFilter" className="h-7 mt-1">
                       <SelectValue placeholder="Select health status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {uniqueHealthStatuses.map(status => (
+                      {uniqueHealthStatuses.map((status) => (
                         <SelectItem key={status} value={status}>
                           {status === "all" ? "All Health Statuses" : status}
                         </SelectItem>
@@ -575,13 +666,20 @@ export default function WebsiteLogs() {
                   </Select>
                 </div>
                 <div className="sm:col-span-1">
-                  <Label htmlFor="logTimeFilter" className="text-xs font-medium text-muted-foreground">Filter Logs by Time</Label>
+                  <Label
+                    htmlFor="logTimeFilter"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    Filter Logs by Time
+                  </Label>
                   <Select
                     value={logTimeFilter}
-                    onValueChange={value => setLogTimeFilter(value as LogTimeFilterType)}
+                    onValueChange={(value) =>
+                      setLogTimeFilter(value as LogTimeFilterType)
+                    }
                     disabled={!!fromDate || !!toDate}
                   >
-                    <SelectTrigger id="logTimeFilter" className="h-9 mt-1">
+                    <SelectTrigger id="logTimeFilter" className="h-7 w-36 mt-1">
                       <SelectValue placeholder="Select time range" />
                     </SelectTrigger>
                     <SelectContent>
@@ -594,47 +692,64 @@ export default function WebsiteLogs() {
                 </div>
                 <div className="flex items-end gap-2 sm:col-span-1">
                   <div>
-                    <Label htmlFor="fromDate" className="text-xs font-medium text-muted-foreground">From</Label>
+                    <Label
+                      htmlFor="fromDate"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      From
+                    </Label>
                     <Input
                       id="fromDate"
                       type="date"
                       value={fromDate}
-                      onChange={e => setFromDate(e.target.value)}
-                      className="h-9 mt-1"
-                      max={toDate || undefined}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="h-7 mt-1 text-xs"
+                      max={maxDate}
+                      min={minDate}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="toDate" className="text-xs font-medium text-muted-foreground">To</Label>
+                    <Label
+                      htmlFor="toDate"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      To
+                    </Label>
                     <Input
                       id="toDate"
                       type="date"
                       value={toDate}
-                      onChange={e => setToDate(e.target.value)}
-                      className="h-9 mt-1"
-                      min={fromDate || undefined}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="h-7 mt-1"
+                      min={minDate}
+                      max={maxDate}
                     />
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-9 w-22 p-4 ml-1 bg-gray-200"
+                    className="h-8 w-22 p-2 ml-1 bg-gray-200 text-xs"
                     onClick={resetFilters}
                   >
                     Reset Filters
                   </Button>
                 </div>
-                <div className="flex items-center mr-4 space-x-2 mt-2 md:mt-0 justify-end">
-                  <Switch
-                    id="showErrorsOnly"
-                    checked={showErrorsOnly}
-                    onCheckedChange={setShowErrorsOnly}
-                  />
-                  <Label htmlFor="showErrorsOnly" className="text-sm">
-                    Show Errors Only
-                  </Label>
                 </div>
+                <div className="flex items-center mr-4 gap-2 justify-end">
+                <Switch
+                  id="showErrorsOnly"
+                  checked={showErrorsOnly}
+                  onCheckedChange={setShowErrorsOnly}
+                />
+                <Label
+                  htmlFor="showErrorsOnly"
+                  className="text-xs text-muted-foreground"
+                >
+                  Show Errors Only
+                </Label>
               </div>
+              </div>
+              
             </div>
 
             <div className="space-y-4 pt-4">
@@ -653,10 +768,17 @@ export default function WebsiteLogs() {
                         <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                         <span className="font-medium">Time:</span>
                         <span className="text-muted-foreground">
-                          {new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(log.checked_at).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </span>
                         <span className="text-muted-foreground hidden md:inline">
-                          - {new Date(log.checked_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          -{" "}
+                          {new Date(log.checked_at).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </span>
                       </div>
                       <div className="flex items-center gap-4 whitespace-nowrap">
@@ -664,16 +786,22 @@ export default function WebsiteLogs() {
                         <span className="font-medium">Health Status:</span>
                         <span
                           className={cn(
-                            log.health_status.toLowerCase() === 'healthy' ? "text-emerald-600" :
-                              log.health_status.toLowerCase() === 'degraded' ? "text-yellow-600" :
-                                log.health_status.toLowerCase() === 'offline' ? "text-red-600" : "text-gray-600"
+                            log.health_status.toLowerCase() === "healthy"
+                              ? "text-emerald-600"
+                              : log.health_status.toLowerCase() === "degraded"
+                              ? "text-yellow-600"
+                              : log.health_status.toLowerCase() === "offline"
+                              ? "text-red-600"
+                              : "text-gray-600"
                           )}
                         >
                           {log.health_status}
                         </span>
                         {log.status_code && (
                           <>
-                            <span className="font-medium ml-1">Status Code:</span>
+                            <span className="font-medium ml-1">
+                              Status Code:
+                            </span>
                             <Badge
                               variant="outline"
                               className={cn(
@@ -690,7 +818,9 @@ export default function WebsiteLogs() {
                         <div className="flex items-center gap-1 whitespace-nowrap">
                           <Timer className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="font-medium">Response time:</span>
-                          <span className="text-muted-foreground font-mono">{log.response_time_ms}ms</span>
+                          <span className="text-muted-foreground font-mono">
+                            {log.response_time_ms}ms
+                          </span>
                         </div>
                       )}
                       {log.error_message && (
@@ -718,20 +848,22 @@ export default function WebsiteLogs() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1}
+                    disabled={currentPage === 1 || paginatedLogs.totalCount === 0}
                     className="gap-1 h-9"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Previous
                   </Button>
                   <div className="flex items-center gap-1">
-                    <span className="text-sm">Page {currentPage} of {paginatedLogs.totalPages}</span>
+                    <span className="text-sm">
+                      Page {paginatedLogs.totalCount === 0 ? 0 : currentPage} of {paginatedLogs.totalPages}
+                    </span>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= paginatedLogs.totalPages}
+                    disabled={currentPage >= paginatedLogs.totalPages || paginatedLogs.totalCount === 0}
                     className="gap-1 h-9"
                   >
                     Next
