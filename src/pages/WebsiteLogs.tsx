@@ -196,9 +196,12 @@ export default function WebsiteLogs() {
       filtered = filtered.filter(log => log.health_status === selectedHealthStatus);
     }
 
-    // Apply show errors only filter
+    // Apply show errors only filter (modified logic)
     if (showErrorsOnly) {
-      filtered = filtered.filter(log => !!log.error_message);
+      filtered = filtered.filter(log => 
+        log.health_status?.toLowerCase() !== 'healthy' || 
+        (log.status_code !== null && log.status_code !== 200)
+      );
     }
 
     return filtered;
