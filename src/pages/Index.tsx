@@ -15,17 +15,6 @@ interface MonitoringLog {
   };
 }
 
-interface DataPoint {
-  timestamp: string;
-  [key: string]: string | number;
-}
-
-interface Metrics {
-  name: string;
-  key: string;
-  color: string;
-}
-
 // Helper function to generate or get website colors
 const getOrGenerateWebsiteColorMap = (websites: string[]): Record<string, string> => {
   // Load existing map from localStorage
@@ -137,17 +126,10 @@ const getOrGenerateWebsiteColorMap = (websites: string[]): Record<string, string
 const Index = () => {
   const [websiteLoading, setWebsiteLoading] = useState(true);
   const [websiteMonitoringData, setWebsiteMonitoringData] = useState<MonitoringLog[]>([]);
-  const { loading, getChartData, getMetricsConfig } = useServerMetrics();
-  const [chartDataForServerCPUPercent, setChartDataForServerCPUPercent] = useState<DataPoint[]>();
-  const [chartDataForServerMemoryPercent, setChartDataForServerMemoryPercent] = useState<DataPoint[]>();
-  const [chartDataForServerDiskPercent, setChartDataForServerDiskPercent] = useState<DataPoint[]>();
-  const [metricsForServerCPU, setMetricsForServerCPU] = useState<Metrics[]>();
-  const [metricsForServerMemory, setMetricsForServerMemory] = useState<Metrics[]>();
-  const [metricsForServerDisk, setMetricsForServerDisk] = useState<Metrics[]>();
+  const { getChartData, getMetricsConfig } = useServerMetrics();
 
   // Memoize the fetch function to prevent unnecessary recreations
   const fetchMonitoringData = useCallback(async () => {
-    setWebsiteLoading(true);
     try {
       const oneHourAgo = new Date();
       oneHourAgo.setHours(oneHourAgo.getHours() - 1);
@@ -237,25 +219,6 @@ const Index = () => {
       color: websiteColorMap[websiteName]
     }));
   }, [websiteMonitoringData, websiteColorMap]);
-
-
-  // useEffect(() => {
-  //   // Helper to update all chart data and metrics configs
-  //   const updateAllMetrics = () => {
-  //     setChartDataForServerCPUPercent(getChartData('cpu_percent'));
-  //     setChartDataForServerMemoryPercent(getChartData('memory_percent'));
-  //     setChartDataForServerDiskPercent(getChartData('disk_percent'));
-  //     setMetricsForServerCPU(getMetricsConfig('cpu_percent'));
-  //     setMetricsForServerMemory(getMetricsConfig('memory_percent'));
-  //     setMetricsForServerDisk(getMetricsConfig('disk_percent'));
-  //   };
-
-  //   updateAllMetrics(); // Initial call
-
-  //   const intervalId = setInterval(updateAllMetrics, 50000);
-
-  //   return () => clearInterval(intervalId);
-  // }, [loading]);
 
   return (
     <DashboardLayout>

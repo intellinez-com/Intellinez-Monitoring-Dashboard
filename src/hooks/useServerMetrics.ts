@@ -138,7 +138,6 @@ export const useServerMetrics = (enableDebugLogging = false) => {
       // Process data in chunks to avoid long-running synchronous operations
       const chunkSize = 100; const metricsByServer: ServerMetrics = {};
       const serverList: { serverName: string; hostname: string }[] = [];
-      const seenHostnames = new Set<string>();
       const seenServerNames = new Set<string>();
 
       for (let i = 0; i < (data?.length || 0); i += chunkSize) {
