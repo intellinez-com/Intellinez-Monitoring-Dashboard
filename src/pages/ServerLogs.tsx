@@ -16,7 +16,7 @@ import {
   Hash,
   AlertCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +33,8 @@ import {
   LineElement,
   PointElement,
   LineController,
-  ChartData
-} from 'chart.js';
+  ChartData,
+} from "chart.js";
 import {
   Select,
   SelectContent,
@@ -44,9 +44,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"
+import { Input } from "@/components/ui/input";
 
-import { Chart } from 'react-chartjs-2';
+import { Chart } from "react-chartjs-2";
 
 ChartJS.register(
   CategoryScale,
@@ -77,9 +77,9 @@ interface ServerMonitoringLog {
   User_Id: string | null;
 }
 
-type ChartTimeFilterType = '1h' | '6h' | '12h' | '24h';
-type LogTimeFilterType = '1h' | '6h' | '12h' | '24h';
-type MetricType = 'cpu_percent' | 'memory_percent' | 'disk_percent';
+type ChartTimeFilterType = "1h" | "6h" | "12h" | "24h";
+type LogTimeFilterType = "1h" | "6h" | "12h" | "24h";
+type MetricType = "cpu_percent" | "memory_percent" | "disk_percent";
 
 export default function ServerLogs() {
   const { id } = useParams();
@@ -90,40 +90,55 @@ export default function ServerLogs() {
   const [logs, setLogs] = useState<ServerMonitoringLog[]>([]);
   const [chartLogs, setChartLogs] = useState<ServerMonitoringLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>('cpu_percent');
+  const [selectedMetric, setSelectedMetric] =
+    useState<MetricType>("cpu_percent");
 
   const urlParams = new URLSearchParams(location.search);
-  const serverName = urlParams.get('name') || location.state?.serverName || "Server";
+  const serverName =
+    urlParams.get("name") || location.state?.serverName || "Server";
 
-  const [chartTimeFilter, setChartTimeFilter] = useState<ChartTimeFilterType>('1h');
-  const [logTimeFilter, setLogTimeFilter] = useState<LogTimeFilterType>('1h');
-  const [showChartUnhappyOnly, setShowChartUnhappyOnly] = useState<boolean>(false);
+  const [chartTimeFilter, setChartTimeFilter] =
+    useState<ChartTimeFilterType>("1h");
+  const [logTimeFilter, setLogTimeFilter] = useState<LogTimeFilterType>("1h");
+  const [showChartUnhappyOnly, setShowChartUnhappyOnly] =
+    useState<boolean>(false);
 
-  const [selectedHealthStatus, setSelectedHealthStatus] = useState<string>("all");
+  const [selectedHealthStatus, setSelectedHealthStatus] =
+    useState<string>("all");
   const [showErrorsOnly, setShowErrorsOnly] = useState<boolean>(false);
 
-  const [uniqueHealthStatuses, setUniqueHealthStatuses] = useState<string[]>([]);
+  const [uniqueHealthStatuses, setUniqueHealthStatuses] = useState<string[]>(
+    []
+  );
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(20);
 
   const getTimelineChartFilteredLogs = useCallback(() => {
     const now = new Date();
-    let filtered = chartLogs.filter(log => {
+    let filtered = chartLogs.filter((log) => {
       if (!log.checked_at) return false;
       const logDate = new Date(log.checked_at);
       if (isNaN(logDate.getTime())) return false;
-      const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
+      const diffInHours =
+        (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
       switch (chartTimeFilter) {
-        case '1h': return diffInHours <= 1;
-        case '6h': return diffInHours <= 6;
-        case '12h': return diffInHours <= 12;
-        case '24h': return diffInHours <= 24;
-        default: return diffInHours <= 1;
+        case "1h":
+          return diffInHours <= 1;
+        case "6h":
+          return diffInHours <= 6;
+        case "12h":
+          return diffInHours <= 12;
+        case "24h":
+          return diffInHours <= 24;
+        default:
+          return diffInHours <= 1;
       }
     });
     if (showChartUnhappyOnly) {
-      filtered = filtered.filter(log => log.health_status.toLowerCase() !== 'healthy');
+      filtered = filtered.filter(
+        (log) => log.health_status.toLowerCase() !== "healthy"
+      );
     }
     return filtered;
   }, [chartLogs, chartTimeFilter, showChartUnhappyOnly]);
@@ -156,8 +171,13 @@ export default function ServerLogs() {
         .order("checked_at", { ascending: false });
 
       // Apply date filters if set
-      if (fromDate) query = query.gte("checked_at", new Date(fromDate).toISOString());
-      if (toDate) query = query.lte("checked_at", new Date(toDate + "T23:59:59").toISOString());
+      if (fromDate)
+        query = query.gte("checked_at", new Date(fromDate).toISOString());
+      if (toDate)
+        query = query.lte(
+          "checked_at",
+          new Date(toDate + "T23:59:59").toISOString()
+        );
 
       const { data, error } = await query;
       if (error) throw error;
@@ -166,8 +186,12 @@ export default function ServerLogs() {
 
       if (data) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
-        const statusesFromLogs = Array.from(new Set(data.map(log => log.health_status))).sort();
-        const combinedStatuses = Array.from(new Set(["all", ...predefinedStatuses, ...statusesFromLogs])).sort((a, b) => {
+        const statusesFromLogs = Array.from(
+          new Set(data.map((log) => log.health_status))
+        ).sort();
+        const combinedStatuses = Array.from(
+          new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
+        ).sort((a, b) => {
           if (a === "all") return -1;
           if (b === "all") return 1;
           return a.localeCompare(b);
@@ -188,43 +212,64 @@ export default function ServerLogs() {
 
   useEffect(() => {
     fetchTableLogs();
-  }, [fetchTableLogs, logTimeFilter, selectedHealthStatus, showErrorsOnly, fromDate, toDate]);
+  }, [
+    fetchTableLogs,
+    logTimeFilter,
+    selectedHealthStatus,
+    showErrorsOnly,
+    fromDate,
+    toDate,
+  ]);
 
   const getFilteredLogs = () => {
     let filtered = logs;
 
     // Date range filter
     if (fromDate) {
-      filtered = filtered.filter(log => new Date(log.checked_at) >= new Date(fromDate));
+      filtered = filtered.filter(
+        (log) => new Date(log.checked_at) >= new Date(fromDate)
+      );
     }
     if (toDate) {
       const toDateObj = new Date(toDate + "T23:59:59");
-      filtered = filtered.filter(log => new Date(log.checked_at) <= toDateObj);
+      filtered = filtered.filter(
+        (log) => new Date(log.checked_at) <= toDateObj
+      );
     }
 
     // Time filter (if no from/to date, fallback to hour-based)
     if (!fromDate && !toDate) {
       const now = new Date();
-      filtered = filtered.filter(log => {
+      filtered = filtered.filter((log) => {
         if (!log.checked_at) return false;
         const logDate = new Date(log.checked_at);
         if (isNaN(logDate.getTime())) return false;
-        const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
+        const diffInHours =
+          (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
         switch (logTimeFilter) {
-          case '1h': return diffInHours <= 1;
-          case '6h': return diffInHours <= 6;
-          case '12h': return diffInHours <= 12;
-          case '24h': return diffInHours <= 24;
-          default: return diffInHours <= 1;
+          case "1h":
+            return diffInHours <= 1;
+          case "6h":
+            return diffInHours <= 6;
+          case "12h":
+            return diffInHours <= 12;
+          case "24h":
+            return diffInHours <= 24;
+          default:
+            return diffInHours <= 1;
         }
       });
     }
 
     if (selectedHealthStatus !== "all") {
-      filtered = filtered.filter(log => log.health_status === selectedHealthStatus);
+      filtered = filtered.filter(
+        (log) => log.health_status === selectedHealthStatus
+      );
     }
     if (showErrorsOnly) {
-      filtered = filtered.filter(log => !!log.error_message);
+      filtered = filtered.filter(
+        (log) => log.health_status?.toLowerCase() !== "healthy"
+      );
     }
     return filtered;
   };
@@ -237,7 +282,7 @@ export default function ServerLogs() {
       totalCount: filtered.length,
       totalPages: Math.ceil(filtered.length / itemsPerPage),
       hasNext: endIndex < filtered.length,
-      hasPrev: currentPage > 1
+      hasPrev: currentPage > 1,
     };
   };
 
@@ -245,104 +290,124 @@ export default function ServerLogs() {
     setCurrentPage(1);
   }, [logTimeFilter, selectedHealthStatus, showErrorsOnly]);
 
-  const prepareTimelineChartData = useCallback((currentChartTimeFilter: ChartTimeFilterType): ChartData<'bar' | 'line', number[], string> => {
-    const filteredLogs = getTimelineChartFilteredLogs();
-    const sortedLogs = [...filteredLogs].sort((a, b) =>
-      new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()
-    );
-    const chartLogs = sortedLogs;
+  const prepareTimelineChartData = useCallback(
+    (
+      currentChartTimeFilter: ChartTimeFilterType
+    ): ChartData<"bar" | "line", number[], string> => {
+      const filteredLogs = getTimelineChartFilteredLogs();
+      const sortedLogs = [...filteredLogs].sort(
+        (a, b) =>
+          new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()
+      );
+      const chartLogs = sortedLogs;
 
-    let barThicknessValue = 8;
-    if (currentChartTimeFilter === '6h') barThicknessValue = 6;
-    else if (currentChartTimeFilter === '12h') barThicknessValue = 4;
-    else if (currentChartTimeFilter === '24h') barThicknessValue = 2;
+      let barThicknessValue = 8;
+      if (currentChartTimeFilter === "6h") barThicknessValue = 6;
+      else if (currentChartTimeFilter === "12h") barThicknessValue = 4;
+      else if (currentChartTimeFilter === "24h") barThicknessValue = 2;
 
-    const metricData = chartLogs.map(log => log[selectedMetric] || 0);
-    const maxMetricInView = metricData.length > 0 ? Math.max(...metricData) : 0;
-    const baseOffset = Math.max(maxMetricInView * 0.25, 20);
-    const dynamicLineData = metricData.map(value => value + maxMetricInView * 0.3 + baseOffset);
+      const metricData = chartLogs.map((log) => log[selectedMetric] || 0);
+      const maxMetricInView =
+        metricData.length > 0 ? Math.max(...metricData) : 0;
+      const baseOffset = Math.max(maxMetricInView * 0.25, 20);
+      const dynamicLineData = metricData.map(
+        (value) => value + maxMetricInView * 0.3 + baseOffset
+      );
 
-    const getMetricLabel = () => {
-      switch (selectedMetric) {
-        case 'cpu_percent':
-          return 'CPU Usage (Bars)';
-        case 'memory_percent':
-          return 'Memory Usage (Bars)';
-        case 'disk_percent':
-          return 'Disk Usage (Bars)';
-        default:
-          return 'CPU Usage (Bars)';
-      }
-    };
+      const getMetricLabel = () => {
+        switch (selectedMetric) {
+          case "cpu_percent":
+            return "CPU Usage (Bars)";
+          case "memory_percent":
+            return "Memory Usage (Bars)";
+          case "disk_percent":
+            return "Disk Usage (Bars)";
+          default:
+            return "CPU Usage (Bars)";
+        }
+      };
 
-    return {
-      labels: chartLogs.map(log => new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })),
-      datasets: [{
-        label: getMetricLabel(),
-        data: metricData,
-        backgroundColor: chartLogs.map(log =>
-          log.health_status.toLowerCase() === 'healthy'
-            ? 'rgb(34, 197, 94)'
-            : 'rgb(239, 68, 68)'
+      return {
+        labels: chartLogs.map((log) =>
+          new Date(log.checked_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
         ),
-        borderColor: chartLogs.map(log =>
-          log.health_status.toLowerCase() === 'healthy'
-            ? 'rgb(34, 197, 94)'
-            : 'rgb(239, 68, 68)'
-        ),
-        borderWidth: 1,
-        borderRadius: 4,
-        barThickness: barThicknessValue,
-        order: 2
-      },
-      {
-        type: 'line' as const,
-        label: 'Trend Line',
-        data: dynamicLineData,
-        borderColor: 'rgb(100, 100, 100)',
-        borderWidth: 2.5,
-        pointBackgroundColor: chartLogs.map(log =>
-          log.health_status.toLowerCase() !== 'healthy'
-            ? 'rgb(255, 0, 0)'
-            : 'transparent'
-        ),
-        pointBorderColor: chartLogs.map(log =>
-          log.health_status.toLowerCase() !== 'healthy'
-            ? 'rgb(255,0,0)'
-            : 'transparent'
-        ),
-        pointRadius: chartLogs.map(log =>
-          log.health_status.toLowerCase() !== 'healthy'
-            ? 5
-            : 0
-        ),
-        pointHoverRadius: chartLogs.map(log =>
-          log.health_status.toLowerCase() !== 'healthy'
-            ? 7
-            : 0
-        ),
-        fill: false,
-        tension: 0.3,
-        order: 1
-      }]
-    };
-  }, [getTimelineChartFilteredLogs, selectedMetric]);
+        datasets: [
+          {
+            label: getMetricLabel(),
+            data: metricData,
+            backgroundColor: chartLogs.map((log) =>
+              log.health_status.toLowerCase() === "healthy"
+                ? "rgb(34, 197, 94)"
+                : "rgb(239, 68, 68)"
+            ),
+            borderColor: chartLogs.map((log) =>
+              log.health_status.toLowerCase() === "healthy"
+                ? "rgb(34, 197, 94)"
+                : "rgb(239, 68, 68)"
+            ),
+            borderWidth: 1,
+            borderRadius: 4,
+            barThickness: barThicknessValue,
+            order: 2,
+          },
+          {
+            type: "line" as const,
+            label: "Trend Line",
+            data: dynamicLineData,
+            borderColor: "rgb(100, 100, 100)",
+            borderWidth: 2.5,
+            pointBackgroundColor: chartLogs.map((log) =>
+              log.health_status.toLowerCase() !== "healthy"
+                ? "rgb(255, 0, 0)"
+                : "transparent"
+            ),
+            pointBorderColor: chartLogs.map((log) =>
+              log.health_status.toLowerCase() !== "healthy"
+                ? "rgb(255,0,0)"
+                : "transparent"
+            ),
+            pointRadius: chartLogs.map((log) =>
+              log.health_status.toLowerCase() !== "healthy" ? 5 : 0
+            ),
+            pointHoverRadius: chartLogs.map((log) =>
+              log.health_status.toLowerCase() !== "healthy" ? 7 : 0
+            ),
+            fill: false,
+            tension: 0.3,
+            order: 1,
+          },
+        ],
+      };
+    },
+    [getTimelineChartFilteredLogs, selectedMetric]
+  );
 
-  const chartData = useMemo(() => prepareTimelineChartData(chartTimeFilter), [chartTimeFilter, prepareTimelineChartData]);
+  const chartData = useMemo(
+    () => prepareTimelineChartData(chartTimeFilter),
+    [chartTimeFilter, prepareTimelineChartData]
+  );
 
   const timelineChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false
+        display: false,
       },
       tooltip: {
         callbacks: {
           title: (tooltipItems: any) => {
             const index = tooltipItems[0].dataIndex;
             const logsForTooltip = getTimelineChartFilteredLogs();
-            const sortedLogs = [...logsForTooltip].sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
+            const sortedLogs = [...logsForTooltip].sort(
+              (a, b) =>
+                new Date(a.checked_at).getTime() -
+                new Date(b.checked_at).getTime()
+            );
             const log = sortedLogs[index];
             if (log && log.checked_at) {
               return new Date(log.checked_at).toLocaleString();
@@ -352,46 +417,50 @@ export default function ServerLogs() {
           label: (context: any) => {
             const index = context.dataIndex;
             const logsForTooltip = getTimelineChartFilteredLogs();
-            const sortedLogs = [...logsForTooltip].sort((a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime());
+            const sortedLogs = [...logsForTooltip].sort(
+              (a, b) =>
+                new Date(a.checked_at).getTime() -
+                new Date(b.checked_at).getTime()
+            );
             const log = sortedLogs[index];
             if (log) {
               return [
                 `CPU Usage: ${log.cpu_percent || 0}%`,
                 `Memory Usage: ${log.memory_percent || 0}%`,
                 `Disk Usage: ${log.disk_percent || 0}%`,
-                `Status: ${log.health_status}`
+                `Status: ${log.health_status}`,
               ];
             }
             return [];
-          }
-        }
-      }
+          },
+        },
+      },
     },
     scales: {
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
+          color: "rgba(0, 0, 0, 0.1)",
         },
         ticks: {
-          callback: (value: number) => `${value}%`
+          callback: (value: number) => `${value}%`,
         },
         border: {
-          display: false
-        }
+          display: false,
+        },
       },
       x: {
         grid: {
-          display: false
+          display: false,
         },
         ticks: {
-          display: false
+          display: false,
         },
         border: {
-          display: false
-        }
-      }
-    }
+          display: false,
+        },
+      },
+    },
   };
 
   const noDataForChart = getTimelineChartFilteredLogs().length === 0;
@@ -405,10 +474,10 @@ export default function ServerLogs() {
       "Disk Usage (%)",
       "Running Processes",
       "Error Message",
-      "Created At"
+      "Created At",
     ];
 
-    const csvData = logs.map(log => [
+    const csvData = logs.map((log) => [
       new Date(log.checked_at).toLocaleString(),
       log.health_status,
       log.cpu_percent || "N/A",
@@ -416,23 +485,28 @@ export default function ServerLogs() {
       log.disk_percent || "N/A",
       log.running_processes || "N/A",
       log.error_message || "None",
-      new Date(log.created_at).toLocaleString()
+      new Date(log.created_at).toLocaleString(),
     ]);
 
     const csvContent = [
       headers.join(","),
-      ...csvData.map(row => row.map(cell =>
-        typeof cell === 'string' && cell.includes(",")
-          ? `"${cell}"`
-          : cell
-      ).join(","))
+      ...csvData.map((row) =>
+        row
+          .map((cell) =>
+            typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
+          )
+          .join(",")
+      ),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `${serverName.replace(/\s+/g, '_')}_monitoring_logs.csv`);
+    link.setAttribute(
+      "download",
+      `${serverName.replace(/\s+/g, "_")}_monitoring_logs.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -457,6 +531,16 @@ export default function ServerLogs() {
     setSelectedHealthStatus("all");
   };
 
+  const maxDate = useMemo(() => {
+  return new Date().toISOString().split("T")[0]; // Today
+}, []);
+
+const minDate = useMemo(() => {
+  const date = new Date();
+  date.setDate(date.getDate() - 30); // 30 days ago
+  return date.toISOString().split("T")[0];
+}, []);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -472,7 +556,10 @@ export default function ServerLogs() {
               Back
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">{serverName}<span className="text-2xl font-semibold"> Monitoring Logs</span></h1>
+              <h1 className="text-3xl font-bold">
+                {serverName}
+                <span className="text-2xl font-semibold"> Monitoring Logs</span>
+              </h1>
             </div>
           </div>
           <div className="flex gap-2">
@@ -489,12 +576,15 @@ export default function ServerLogs() {
               variant="outline"
               size="sm"
               onClick={() => {
-                fetchChartLogs(); fetchTableLogs();
+                fetchChartLogs();
+                fetchTableLogs();
               }}
               disabled={isLoading}
               className="gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
@@ -509,28 +599,42 @@ export default function ServerLogs() {
               <div className="p-4 rounded-lg border bg-card">
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex justify-between gap-2 items-center">
-                    <h3 className="text-sm font-medium">Resource Usage Timeline</h3>
+                    <h3 className="text-sm font-medium">
+                      Resource Usage Timeline
+                    </h3>
                     <div className="flex items-center space-x-2 pl-2">
                       <Button
-                        variant={selectedMetric === 'cpu_percent' ? 'default' : 'outline'}
+                        variant={
+                          selectedMetric === "cpu_percent"
+                            ? "default"
+                            : "outline"
+                        }
                         size="sm"
-                        onClick={() => setSelectedMetric('cpu_percent')}
+                        onClick={() => setSelectedMetric("cpu_percent")}
                         className="h-7 text-xs"
                       >
                         CPU
                       </Button>
                       <Button
-                        variant={selectedMetric === 'memory_percent' ? 'default' : 'outline'}
+                        variant={
+                          selectedMetric === "memory_percent"
+                            ? "default"
+                            : "outline"
+                        }
                         size="sm"
-                        onClick={() => setSelectedMetric('memory_percent')}
+                        onClick={() => setSelectedMetric("memory_percent")}
                         className="h-7 text-xs"
                       >
                         Memory
                       </Button>
                       <Button
-                        variant={selectedMetric === 'disk_percent' ? 'default' : 'outline'}
+                        variant={
+                          selectedMetric === "disk_percent"
+                            ? "default"
+                            : "outline"
+                        }
                         size="sm"
-                        onClick={() => setSelectedMetric('disk_percent')}
+                        onClick={() => setSelectedMetric("disk_percent")}
                         className="h-7 text-xs"
                       >
                         Disk
@@ -538,36 +642,43 @@ export default function ServerLogs() {
                     </div>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center ">
-
                     <div className="flex items-center space-x-2 pl-2">
                       <Button
-                        variant={chartTimeFilter === '1h' ? 'default' : 'outline'}
+                        variant={
+                          chartTimeFilter === "1h" ? "default" : "outline"
+                        }
                         size="sm"
-                        onClick={() => setChartTimeFilter('1h')}
+                        onClick={() => setChartTimeFilter("1h")}
                         className="h-7 text-xs"
                       >
                         Last Hour
                       </Button>
                       <Button
-                        variant={chartTimeFilter === '6h' ? 'default' : 'outline'}
+                        variant={
+                          chartTimeFilter === "6h" ? "default" : "outline"
+                        }
                         size="sm"
-                        onClick={() => setChartTimeFilter('6h')}
+                        onClick={() => setChartTimeFilter("6h")}
                         className="h-7 text-xs"
                       >
                         6 Hours
                       </Button>
                       <Button
-                        variant={chartTimeFilter === '12h' ? 'default' : 'outline'}
+                        variant={
+                          chartTimeFilter === "12h" ? "default" : "outline"
+                        }
                         size="sm"
-                        onClick={() => setChartTimeFilter('12h')}
+                        onClick={() => setChartTimeFilter("12h")}
                         className="h-7 text-xs"
                       >
                         12 Hours
                       </Button>
                       <Button
-                        variant={chartTimeFilter === '24h' ? 'default' : 'outline'}
+                        variant={
+                          chartTimeFilter === "24h" ? "default" : "outline"
+                        }
                         size="sm"
-                        onClick={() => setChartTimeFilter('24h')}
+                        onClick={() => setChartTimeFilter("24h")}
                         className="h-7 text-xs"
                       >
                         24 Hours
@@ -579,7 +690,10 @@ export default function ServerLogs() {
                         checked={showChartUnhappyOnly}
                         onCheckedChange={setShowChartUnhappyOnly}
                       />
-                      <Label htmlFor="showChartUnhappyOnly" className="text-xs text-muted-foreground">
+                      <Label
+                        htmlFor="showChartUnhappyOnly"
+                        className="text-xs text-muted-foreground"
+                      >
                         Show Errors Only
                       </Label>
                     </div>
@@ -587,7 +701,7 @@ export default function ServerLogs() {
                 </div>
                 <div className="h-[120px] w-full">
                   <Chart
-                    type='bar'
+                    type="bar"
                     data={chartData}
                     options={timelineChartOptions}
                   />
@@ -600,81 +714,108 @@ export default function ServerLogs() {
               </div>
             </div>
 
-            <div className="px-1 py-4 border-t border-b">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
-                <div className="sm:col-span-1">
-                  <Label htmlFor="healthStatusFilter" className="text-xs font-medium text-muted-foreground">Filter by Health Status</Label>
-                  <Select value={selectedHealthStatus} onValueChange={setSelectedHealthStatus}>
-                    <SelectTrigger id="healthStatusFilter" className="h-9 mt-1">
-                      <SelectValue placeholder="Select health status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {uniqueHealthStatuses.map(status => (
-                        <SelectItem key={status} value={status}>
-                          {status === "all" ? "All Health Statuses" : status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="sm:col-span-1">
-                  <Label htmlFor="logTimeFilter" className="text-xs font-medium text-muted-foreground">Filter Logs by Time</Label>
-                  <Select 
-                    value={logTimeFilter} 
-                    onValueChange={(value) => {
-                      console.log("value changed for logtimefilter ", value);
-                      setLogTimeFilter(value as LogTimeFilterType);
-                      console.log("log time filter ", logTimeFilter);
-                    }}
-                    disabled={!!fromDate || !!toDate}
-                  >
-                    <SelectTrigger id="logTimeFilter" className="h-9 mt-1">
-                      <SelectValue placeholder="Select time range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1h">Last Hour</SelectItem>
-                      <SelectItem value="6h">Last 6 Hours</SelectItem>
-                      <SelectItem value="12h">Last 12 hours</SelectItem>
-                      <SelectItem value="24h">Last 24 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-end gap-2 sm:col-span-1">
-                  <div>
-                    <Label htmlFor="fromDate" className="text-xs font-medium text-muted-foreground">From</Label>
-                    <Input
-                      id="fromDate"
-                      type="date"
-                      value={fromDate}
-                      onChange={e => setFromDate(e.target.value)}
-                      className="h-9 mt-1"
-                      max={toDate || undefined}
-                    />
+            <div className="px-1 py-4 border-t border-b ">
+              <div className="flex items-center justify-between gap-4 items-center">
+                <div className="flex items-center justify-between gap-5">
+                  <div className="sm:col-span-1">
+                    <Label
+                      htmlFor="healthStatusFilter"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Filter by Health Status
+                    </Label>
+                    <Select
+                      value={selectedHealthStatus}
+                      onValueChange={setSelectedHealthStatus}
+                    >
+                      <SelectTrigger
+                        id="healthStatusFilter"
+                        className="h-7 mt-1"
+                      >
+                        <SelectValue placeholder="Select health status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {uniqueHealthStatuses.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status === "all" ? "All Health Statuses" : status}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div>
-                    <Label htmlFor="toDate" className="text-xs font-medium text-muted-foreground">To</Label>
-                    <Input
-                      id="toDate"
-                      type="date"
-                      value={toDate}
-                      onChange={e => setToDate(e.target.value)}
-                      className="h-9 mt-1"
-                      min={fromDate || undefined}
-                    />
+                  <div className="sm:col-span-1">
+                    <Label
+                      htmlFor="logTimeFilter"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Filter Logs by Time
+                    </Label>
+                    <Select
+                      value={logTimeFilter}
+                      onValueChange={(value) => {
+                        console.log("value changed for logtimefilter ", value);
+                        setLogTimeFilter(value as LogTimeFilterType);
+                        console.log("log time filter ", logTimeFilter);
+                      }}
+                      disabled={!!fromDate || !!toDate}
+                    >
+                      <SelectTrigger id="logTimeFilter" className="h-7 mt-1">
+                        <SelectValue placeholder="Select time range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1h">Last Hour</SelectItem>
+                        <SelectItem value="6h">Last 6 Hours</SelectItem>
+                        <SelectItem value="12h">Last 12 hours</SelectItem>
+                        <SelectItem value="24h">Last 24 hours</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 w-22 p-4 ml-1 bg-gray-200"
-                    onClick={resetFilters}
-                  >
-                    Reset Filters
-                  </Button>
-                </div>
-                
-                
+                  <div className="flex items-end gap-2 sm:col-span-1">
+                    <div>
+                      <Label
+                        htmlFor="fromDate"
+                        className="text-xs font-medium text-muted-foreground"
+                      >
+                        From
+                      </Label>
+                      <Input
+                        id="fromDate"
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        className="h-7 mt-1"
+                        max={maxDate}
+                      min={minDate}
+                      />
+                    </div>
+                    <div>
+                      <Label
+                        htmlFor="toDate"
+                        className="text-xs font-medium text-muted-foreground"
+                      >
+                        To
+                      </Label>
+                      <Input
+                        id="toDate"
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        className="h-7 mt-1"
+                        max={maxDate}
+                      min={minDate}
+                      />
+                    </div>
 
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-22 p-2 ml-1 bg-gray-200 text-xs "
+                      onClick={resetFilters}
+                    >
+                      Reset Filters
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="flex items-center mr-4 space-x-2 justify-end sm:col-span-1">
                   <Switch
@@ -682,7 +823,10 @@ export default function ServerLogs() {
                     checked={showErrorsOnly}
                     onCheckedChange={setShowErrorsOnly}
                   />
-                  <Label htmlFor="showErrorsOnly" className="text-sm">
+                  <Label
+                    htmlFor="showErrorsOnly"
+                    className="text-xs text-muted-foreground"
+                  >
                     Show Errors Only
                   </Label>
                 </div>
@@ -705,10 +849,17 @@ export default function ServerLogs() {
                         <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                         <span className="font-medium">Time:</span>
                         <span className="text-muted-foreground">
-                          {new Date(log.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(log.checked_at).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </span>
                         <span className="text-muted-foreground hidden md:inline">
-                          - {new Date(log.checked_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          -{" "}
+                          {new Date(log.checked_at).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </span>
                       </div>
 
@@ -717,9 +868,13 @@ export default function ServerLogs() {
                         <span className="font-medium">Health Status:</span>
                         <span
                           className={cn(
-                            log.health_status.toLowerCase() === 'healthy' ? "text-emerald-600" :
-                              log.health_status.toLowerCase() === 'degraded' ? "text-yellow-600" :
-                                log.health_status.toLowerCase() === 'offline' ? "text-red-600" : "text-gray-600"
+                            log.health_status.toLowerCase() === "healthy"
+                              ? "text-emerald-600"
+                              : log.health_status.toLowerCase() === "degraded"
+                              ? "text-yellow-600"
+                              : log.health_status.toLowerCase() === "offline"
+                              ? "text-red-600"
+                              : "text-gray-600"
                           )}
                         >
                           {log.health_status}
@@ -729,19 +884,25 @@ export default function ServerLogs() {
                       <div className="flex items-center gap-1 whitespace-nowrap">
                         <Activity className="h-3.5 w-3.5 text-muted-foreground" />
                         <span className="font-medium">CPU:</span>
-                        <span className="text-muted-foreground font-mono">{log.cpu_percent || 0}%</span>
+                        <span className="text-muted-foreground font-mono">
+                          {log.cpu_percent || 0}%
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1 whitespace-nowrap">
                         <Activity className="h-3.5 w-3.5 text-muted-foreground" />
                         <span className="font-medium">Memory:</span>
-                        <span className="text-muted-foreground font-mono">{log.memory_percent || 0}%</span>
+                        <span className="text-muted-foreground font-mono">
+                          {log.memory_percent || 0}%
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1 whitespace-nowrap">
                         <Activity className="h-3.5 w-3.5 text-muted-foreground" />
                         <span className="font-medium">Disk:</span>
-                        <span className="text-muted-foreground font-mono">{log.disk_percent || 0}%</span>
+                        <span className="text-muted-foreground font-mono">
+                          {log.disk_percent || 0}%
+                        </span>
                       </div>
 
                       {log.error_message && (
@@ -770,7 +931,7 @@ export default function ServerLogs() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1}
+                    disabled={currentPage === 1 || getPaginatedLogs().totalCount === 0}
                     className="gap-1 h-9"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -778,14 +939,19 @@ export default function ServerLogs() {
                   </Button>
 
                   <div className="flex items-center gap-1">
-                    <span className="text-sm">Page {currentPage} of {Math.ceil(getPaginatedLogs().totalCount / itemsPerPage)}</span>
+                    <span className="text-sm">
+                      Page {getPaginatedLogs().totalCount === 0 ? 0 : currentPage} of{" "}
+                      {getPaginatedLogs().totalPages} 
+                    </span>
                   </div>
 
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(getPaginatedLogs().totalCount / itemsPerPage)}
+                    disabled={
+                      currentPage >= getPaginatedLogs().totalPages || getPaginatedLogs().totalCount === 0
+                    }
                     className="gap-1 h-9"
                   >
                     Next
@@ -799,4 +965,4 @@ export default function ServerLogs() {
       </div>
     </DashboardLayout>
   );
-} 
+}
