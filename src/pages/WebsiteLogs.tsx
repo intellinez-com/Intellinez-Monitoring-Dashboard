@@ -13,14 +13,12 @@ import {
   XCircle,
   Download,
   Timer,
-  Hash,
   AlertCircle,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
-
 import { cn } from "@/lib/utils";
 import {
   Chart as ChartJS,
@@ -42,9 +40,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-
 import { Chart } from 'react-chartjs-2';
 
 ChartJS.register(
@@ -74,7 +72,6 @@ interface MonitoringLog {
   User_Id: string | null;
 }
 
-// type TimeFilter = '1h' | '6h' | '12h' | '24h';
 type ChartTimeFilterType = '1h' | '6h' | '12h' | '24h';
 type LogTimeFilterType = '1h' | '6h' | '12h' | '24h';
 
@@ -82,73 +79,92 @@ export default function WebsiteLogs() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
+  // Separate state for chart logs and table logs
+  const [chartLogs, setChartLogs] = useState<MonitoringLog[]>([]);
   const [logs, setLogs] = useState<MonitoringLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const urlParams = new URLSearchParams(location.search);
   const websiteName = urlParams.get('name') || location.state?.websiteName || "Website";
 
-  // Add these to your component's state
-  // const [timeFilter, setTimeFilter] = useState<TimeFilter>('1h');
   const [chartTimeFilter, setChartTimeFilter] = useState<ChartTimeFilterType>('1h');
   const [logTimeFilter, setLogTimeFilter] = useState<LogTimeFilterType>('1h');
   const [showChartUnhappyOnly, setShowChartUnhappyOnly] = useState<boolean>(false);
 
-  // New state variables for advanced filters
   const [selectedHealthStatus, setSelectedHealthStatus] = useState<string>("all");
   const [showErrorsOnly, setShowErrorsOnly] = useState<boolean>(false);
 
-  // State for populating filter dropdowns
   const [uniqueHealthStatuses, setUniqueHealthStatuses] = useState<string[]>([]);
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(20);
 
-  // New function to filter logs specifically for the timeline chart (time-based only)
-  const getTimelineChartFilteredLogs = useCallback(() => {
-    const now = new Date();
-    let chartLogs = logs.filter(log => {
-      if (!log.checked_at) return false;
-      const logDate = new Date(log.checked_at);
-      if (isNaN(logDate.getTime())) return false;
-
-      const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
-
-      switch (chartTimeFilter) {
-        case '1h':
-          return diffInHours <= 1;
-        case '6h':
-          return diffInHours <= 6;
-        case '12h':
-          return diffInHours <= 12;
-        case '24h':
-          return diffInHours <= 24;
-        default:
-          return diffInHours <= 1;
-      }
-    });
-
-    if (showChartUnhappyOnly) {
-      chartLogs = chartLogs.filter(log => log.health_status.toLowerCase() !== 'healthy');
-    }
-    return chartLogs;
-  }, [logs, chartTimeFilter, showChartUnhappyOnly]);
-
-  const fetchLogs = async () => {
+  // Fetch chart data (for timeline chart)
+  const fetchChartData = useCallback(async () => {
     setIsLoading(true);
     try {
+      const now = new Date();
+      let hoursAgo = 1;
+      switch (chartTimeFilter) {
+        case '6h': hoursAgo = 6; break;
+        case '12h': hoursAgo = 12; break;
+        case '24h': hoursAgo = 24; break;
+        default: hoursAgo = 1;
+      }
+      const startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+
       const { data, error } = await supabase
         .from("website_monitoring_logs")
         .select("*")
         .eq("website_id", id)
+        .gte("checked_at", startTime.toISOString())
         .order("checked_at", { ascending: false });
 
       if (error) throw error;
+      setChartLogs(data || []);
+    } catch (error) {
+      console.error("Error fetching chart data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, chartTimeFilter]);
+
+  // Fetch logs data (for table)
+  const fetchLogsData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const now = new Date();
+      let hoursAgo = 1;
+      switch (logTimeFilter) {
+        case '6h': hoursAgo = 6; break;
+        case '12h': hoursAgo = 12; break;
+        case '24h': hoursAgo = 24; break;
+        default: hoursAgo = 1;
+      }
+      let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+      let endTime = now;
+
+      // If user selected fromDate or toDate, override the time filter
+      if (fromDate) startTime = new Date(fromDate);
+      if (toDate) endTime = new Date(toDate + "T23:59:59");
+
+      let query = supabase
+        .from("website_monitoring_logs")
+        .select("*")
+        .eq("website_id", id)
+        .gte("checked_at", startTime.toISOString())
+        .lte("checked_at", endTime.toISOString())
+        .order("checked_at", { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error) throw error;
       setLogs(data || []);
-      // Reset to first page when new data is fetched
       setCurrentPage(1);
-      // Populate unique filter options after fetching logs
+
       if (data) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
         const statusesFromLogs = Array.from(new Set(data.map(log => log.health_status))).sort();
@@ -160,38 +176,36 @@ export default function WebsiteLogs() {
         setUniqueHealthStatuses(combinedStatuses);
       }
     } catch (error) {
-      console.error("Error fetching logs:", error);
+      console.error("Error fetching logs data:", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, logTimeFilter, fromDate, toDate]);
 
-  // Add this function to filter logs based on time
-  const getFilteredLogs = () => {
-    const now = new Date();
+  // Fetch chart data when chartTimeFilter or id changes
+  useEffect(() => {
+    fetchChartData();
+  }, [fetchChartData]);
 
-    let filtered = logs.filter(log => {
-      if (!log.checked_at) return false;
-      const logDate = new Date(log.checked_at);
-      if (isNaN(logDate.getTime())) return false;
+  // Fetch logs data when logTimeFilter or id changes, or filters change
+  useEffect(() => {
+    fetchLogsData();
+  }, [fetchLogsData, selectedHealthStatus, showErrorsOnly, fromDate, toDate]);
 
-      const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
+  // Filter chart logs for timeline chart
+  const getTimelineChartFilteredLogs = useCallback(() => {
+    let chartFiltered = chartLogs;
+    if (showChartUnhappyOnly) {
+      chartFiltered = chartFiltered.filter(log => log.health_status.toLowerCase() !== 'healthy');
+    }
+    return chartFiltered;
+  }, [chartLogs, showChartUnhappyOnly]);
 
-      switch (logTimeFilter) {
-        case '1h':
-          return diffInHours <= 1;
-        case '6h':
-          return diffInHours <= 6;
-        case '12h':
-          return diffInHours <= 12;
-        case '24h':
-          return diffInHours <= 24;
-        default:
-          return diffInHours <= 1;
-      }
-    });
+  // Filter logs for table
+  const getFilteredLogs = useCallback(() => {
+    let filtered = logs;
 
-    // Apply health status filter
+    // Health status filter
     if (selectedHealthStatus !== "all") {
       filtered = filtered.filter(log => log.health_status === selectedHealthStatus);
     }
@@ -205,10 +219,10 @@ export default function WebsiteLogs() {
     }
 
     return filtered;
-  };
+  }, [logs, selectedHealthStatus, showErrorsOnly]);
 
-  // Get paginated logs
-  const getPaginatedLogs = () => {
+  // Memoized paginated logs
+  const paginatedLogs = useMemo(() => {
     const filtered = getFilteredLogs();
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -219,14 +233,14 @@ export default function WebsiteLogs() {
       hasNext: endIndex < filtered.length,
       hasPrev: currentPage > 1
     };
-  };
+  }, [getFilteredLogs, currentPage, itemsPerPage]);
 
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [logTimeFilter, selectedHealthStatus, showErrorsOnly]);
 
-  // Modify your prepareTimelineChartData function
+  // Chart data preparation
   const prepareTimelineChartData = useCallback((currentChartTimeFilter: ChartTimeFilterType): ChartData<'bar' | 'line', number[], string> => {
     const filteredLogs = getTimelineChartFilteredLogs();
     const sortedLogs = [...filteredLogs].sort((a, b) =>
@@ -297,9 +311,9 @@ export default function WebsiteLogs() {
     };
   }, [getTimelineChartFilteredLogs]);
 
-  const chartData = useMemo(() => prepareTimelineChartData(chartTimeFilter), [chartTimeFilter, prepareTimelineChartData]);
+  const chartData = useMemo(() => prepareTimelineChartData(chartTimeFilter),
+    [chartTimeFilter, prepareTimelineChartData]);
 
-  // Moved timelineChartOptions definition here, immediately before the return statement
   const timelineChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -365,12 +379,7 @@ export default function WebsiteLogs() {
 
   const noDataForChart = getTimelineChartFilteredLogs().length === 0;
 
-  useEffect(() => {
-    fetchLogs();
-  }, [id]);
-
   const exportToCSV = () => {
-    // Convert logs to CSV format
     const headers = [
       "Checked At",
       "Health Status",
@@ -398,7 +407,6 @@ export default function WebsiteLogs() {
       ).join(","))
     ].join("\n");
 
-    // Create and trigger download
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -408,7 +416,6 @@ export default function WebsiteLogs() {
     link.click();
     document.body.removeChild(link);
   };
-
 
   const getHealthStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
@@ -429,6 +436,13 @@ export default function WebsiteLogs() {
     if (code >= 300 && code < 400) return "bg-blue-100 text-blue-700";
     if (code >= 400 && code < 500) return "bg-yellow-100 text-yellow-700";
     return "bg-red-100 text-red-700";
+  };
+
+  const resetFilters = () => {
+    setFromDate("");
+    setToDate("");
+    setLogTimeFilter("1h");
+    setSelectedHealthStatus("all");
   };
 
   return (
@@ -462,7 +476,9 @@ export default function WebsiteLogs() {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchLogs}
+              onClick={() => {
+                fetchChartData(); fetchLogsData();
+              }}
               disabled={isLoading}
               className="gap-2"
             >
@@ -477,13 +493,11 @@ export default function WebsiteLogs() {
             <CardTitle>Monitoring History</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Add this new section for the response time chart */}
             <div className="mb-6">
               <div className="p-4 rounded-lg border bg-card">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-sm font-medium">Response Time Timeline</h3>
                   <div className="flex gap-2 flex-wrap items-center">
-                    {/* Time Period Filters */}
                     <Button
                       variant={chartTimeFilter === '1h' ? 'default' : 'outline'}
                       size="sm"
@@ -516,7 +530,6 @@ export default function WebsiteLogs() {
                     >
                       24 Hours
                     </Button>
-                    {/* New Switch for chart: Show Unhappy Only */}
                     <div className="flex items-center space-x-2 pl-2">
                       <Switch
                         id="showChartUnhappyOnly"
@@ -529,7 +542,6 @@ export default function WebsiteLogs() {
                     </div>
                   </div>
                 </div>
-                {/* MODIFIED: Chart container to fit available width */}
                 <div className="h-[120px] w-full">
                   <Chart
                     type='bar'
@@ -537,7 +549,6 @@ export default function WebsiteLogs() {
                     options={timelineChartOptions}
                   />
                 </div>
-                {/* Add a message when no data is available for the selected time range */}
                 {noDataForChart && (
                   <div className="text-center py-2 text-muted-foreground text-sm">
                     No data available for the selected time range
@@ -546,10 +557,8 @@ export default function WebsiteLogs() {
               </div>
             </div>
 
-            {/* New Advanced Filters Section */}
             <div className="px-1 py-4 border-t border-b">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
-                {/* Health Status Filter */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
                 <div className="sm:col-span-1">
                   <Label htmlFor="healthStatusFilter" className="text-xs font-medium text-muted-foreground">Filter by Health Status</Label>
                   <Select value={selectedHealthStatus} onValueChange={setSelectedHealthStatus}>
@@ -567,11 +576,11 @@ export default function WebsiteLogs() {
                 </div>
                 <div className="sm:col-span-1">
                   <Label htmlFor="logTimeFilter" className="text-xs font-medium text-muted-foreground">Filter Logs by Time</Label>
-                  <Select value={logTimeFilter} onValueChange={(value) => {
-                    console.log("value changed for logtimefilter ", value);
-                    setLogTimeFilter(value as LogTimeFilterType);
-                    console.log("log time filter ", logTimeFilter);
-                  }}>
+                  <Select
+                    value={logTimeFilter}
+                    onValueChange={value => setLogTimeFilter(value as LogTimeFilterType)}
+                    disabled={!!fromDate || !!toDate}
+                  >
                     <SelectTrigger id="logTimeFilter" className="h-9 mt-1">
                       <SelectValue placeholder="Select time range" />
                     </SelectTrigger>
@@ -583,8 +592,39 @@ export default function WebsiteLogs() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="flex items-center space-x-2 justify-self-start sm:col-span-1">
+                <div className="flex items-end gap-2 sm:col-span-1">
+                  <div>
+                    <Label htmlFor="fromDate" className="text-xs font-medium text-muted-foreground">From</Label>
+                    <Input
+                      id="fromDate"
+                      type="date"
+                      value={fromDate}
+                      onChange={e => setFromDate(e.target.value)}
+                      className="h-9 mt-1"
+                      max={toDate || undefined}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="toDate" className="text-xs font-medium text-muted-foreground">To</Label>
+                    <Input
+                      id="toDate"
+                      type="date"
+                      value={toDate}
+                      onChange={e => setToDate(e.target.value)}
+                      className="h-9 mt-1"
+                      min={fromDate || undefined}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-22 p-4 ml-1 bg-gray-200"
+                    onClick={resetFilters}
+                  >
+                    Reset Filters
+                  </Button>
+                </div>
+                <div className="flex items-center mr-4 space-x-2 mt-2 md:mt-0 justify-end">
                   <Switch
                     id="showErrorsOnly"
                     checked={showErrorsOnly}
@@ -597,20 +637,18 @@ export default function WebsiteLogs() {
               </div>
             </div>
 
-
             <div className="space-y-4 pt-4">
-              {getPaginatedLogs().logs.length === 0 ? ( // Use getPaginatedLogs() here to reflect all filters
+              {paginatedLogs.logs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No monitoring logs found
                 </div>
               ) : (
-                getPaginatedLogs().logs.map((log) => (
+                paginatedLogs.logs.map((log) => (
                   <div
                     key={log.id}
                     className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-sm"
                   >
                     <div className="flex flex-wrap items-center gap-x-10 gap-y-1">
-                      {/* Timestamp (Short) */}
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                         <span className="font-medium">Time:</span>
@@ -621,8 +659,6 @@ export default function WebsiteLogs() {
                           - {new Date(log.checked_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
-
-                      {/* Health Status & Code */}
                       <div className="flex items-center gap-4 whitespace-nowrap">
                         {getHealthStatusIcon(log.health_status)}
                         <span className="font-medium">Health Status:</span>
@@ -650,8 +686,6 @@ export default function WebsiteLogs() {
                           </>
                         )}
                       </div>
-
-                      {/* Response Time */}
                       {log.response_time_ms !== null && (
                         <div className="flex items-center gap-1 whitespace-nowrap">
                           <Timer className="h-3.5 w-3.5 text-muted-foreground" />
@@ -659,8 +693,6 @@ export default function WebsiteLogs() {
                           <span className="text-muted-foreground font-mono">{log.response_time_ms}ms</span>
                         </div>
                       )}
-
-                      {/* Error Indicator (only if error exists) */}
                       {log.error_message && (
                         <div className="flex items-center gap-1 text-red-500 whitespace-nowrap">
                           <AlertCircle className="h-3.5 w-3.5" />
@@ -668,7 +700,6 @@ export default function WebsiteLogs() {
                         </div>
                       )}
                     </div>
-                    {/* Error Message Section (if exists, on new line) */}
                     {log.error_message && (
                       <div className="mt-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700">
                         {log.error_message}
@@ -678,12 +709,10 @@ export default function WebsiteLogs() {
                 ))
               )}
 
-              {/* Pagination Controls */}
               <div className="flex items-center justify-between pt-6 pb-2">
                 <div className="text-sm text-gray-600">
-                  Total: {getPaginatedLogs().totalCount} logs
+                  Total: {paginatedLogs.totalCount} logs
                 </div>
-
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -695,16 +724,14 @@ export default function WebsiteLogs() {
                     <ChevronLeft className="h-4 w-4" />
                     Previous
                   </Button>
-
                   <div className="flex items-center gap-1">
-                    <span className="text-sm">Page {currentPage} of {Math.ceil(getPaginatedLogs().totalCount / itemsPerPage)}</span>
+                    <span className="text-sm">Page {currentPage} of {paginatedLogs.totalPages}</span>
                   </div>
-
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(getPaginatedLogs().totalCount / itemsPerPage)}
+                    disabled={currentPage >= paginatedLogs.totalPages}
                     className="gap-1 h-9"
                   >
                     Next

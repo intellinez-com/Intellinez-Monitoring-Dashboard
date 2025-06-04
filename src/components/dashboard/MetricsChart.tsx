@@ -80,35 +80,6 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
     setFocusedMetricKey((prev) => (prev === clickedKey ? null : clickedKey));
   };
 
-  // custom legend renderer {not used for now}
-  // const renderCustomLegend = (props: any) => {
-  //   const { payload } = props;
-  //   return (
-  //     <div style={{ padding: '10px', fontSize: 12 }}>
-  //       {payload.map((entry: any, index: number) => {
-  //         const isActive = focusedMetricKey === entry.dataKey;
-  //         return (
-  //           <div
-  //             key={`item-${index}`}
-  //             onClick={() => { handleLegendClick(entry); console.log("clicked"); }}
-  //             style={{
-  //               cursor: 'pointer',
-  //               marginBottom: 6,
-  //               padding: '4px 8px',
-  //               borderRadius: '5px',
-  //               backgroundColor: isActive ? '#e0f7fa' : 'transparent',
-  //               fontWeight: isActive ? 'bold' : 'normal',
-  //               color: entry.color,
-  //             }}
-  //           >
-  //             {entry.value}
-  //           </div>
-  //         );
-  //       })}
-  //     </div>
-  //   );
-  // };
-
   if (loading) {
     return (
       <Card className="bg-slate-800 text-white">
@@ -218,7 +189,6 @@ export function MetricsChart({ title, description, data, metrics }: MetricsChart
                 height: '100%',
                 paddingLeft: '10px',
                 color: '#fff',
-                cursor: 'pointer',
                 userSelect: 'none',
               }}
               onClick={handleLegendClick}
