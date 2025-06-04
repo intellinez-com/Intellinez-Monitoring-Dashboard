@@ -50,21 +50,21 @@ export function ServerManager() {
   const [activeFilter, setActiveFilter] = useState<
     "All" | "Healthy" | "Degraded" | "Offline" | "Intermittent"
   >("All");
-  const [is_Monitoring_websites, setis_Monitoring_websites] = useState(() => {
+  // Renamed for clarity and consistency
+  const [isMonitoringServers, setIsMonitoringServers] = useState(() => {
     const stored = localStorage.getItem("is_Monitoring_servers");
     return stored ? JSON.parse(stored) : false;
   });
 
   useEffect(() => {
-    localStorage.setItem("is_Monitoring_servers", JSON.stringify(is_Monitoring_websites));
-  }, [is_Monitoring_websites]);
+    localStorage.setItem("is_Monitoring_servers", JSON.stringify(isMonitoringServers));
+  }, [isMonitoringServers]);
 
   const [formData, setFormData] = useState({
     servername: "",
     hostname: "",
     ip_address: "",
   });
-
 
   const { user } = useUser();
   const userId = user?.id;
@@ -86,11 +86,9 @@ export function ServerManager() {
       if (formData.hostname.trim() === "") {
         throw new Error("Please enter a valid hostname");
       }
-
       if (!formData.ip_address.trim()) {
         throw new Error("Please enter a valid IP address");
       }
-
       if (!formData.servername.trim()) {
         throw new Error("Please enter a server name.");
       }
@@ -137,7 +135,7 @@ export function ServerManager() {
         description: "Server added successfully",
         variant: "success",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding server:", error);
       toast({
         title: "Error",
@@ -154,7 +152,7 @@ export function ServerManager() {
   };
 
   const confirmDelete = async () => {
-    if (!setSelectedServerName || isDeleting) return;
+    if (!selectedServerName || isDeleting) return;
 
     setIsDeleting(true);
 
@@ -167,9 +165,7 @@ export function ServerManager() {
       if (error) throw error;
       // Remove color mapping from localStorage
       try {
-        if (selectedServerName) {
-          localStorage.removeItem(`server-color-${selectedServerName}`);
-        }
+        localStorage.removeItem(`server-color-${selectedServerName}`);
       } catch (e) {
         // Ignore localStorage errors
       }
@@ -183,7 +179,7 @@ export function ServerManager() {
       });
       setConfirmOpen(false);
       setSelectedServerName(null);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Could not delete server",
@@ -197,17 +193,17 @@ export function ServerManager() {
   const fetchServers = async () => {
     if (!userId) return;
 
-    let freshData: ServerMetrics[] = [];
+    setIsLoading(true);
 
     try {
-      setIsLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Optional: keep a short delay for UX smoothness
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const { data, error } = await supabase.rpc("get_latest_unique_servers");
-      // console.log(data);
       if (error) throw error;
 
-      freshData = data || [];
+      setServers(data || []);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error("Error fetching servers:", error);
       toast({
@@ -215,31 +211,22 @@ export function ServerManager() {
         description: `Could not refresh/load servers.`,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
-    // console.log(freshData);
-    setServers((prev) => {
-      if (JSON.stringify(prev) !== JSON.stringify(freshData)) {
-        return freshData;
-      }
-      return prev;
-    });
-
-    setLastUpdated(new Date());
-    setTimeout(() => setIsLoading(false), 200);
   };
-
 
   useEffect(() => {
     fetchServers();
 
-    if (!is_Monitoring_websites) return;
+    if (!isMonitoringServers) return;
 
     const intervalId = setInterval(() => {
       fetchServers();
     }, 55000);
 
     return () => clearInterval(intervalId);
-  }, [userId, is_Monitoring_websites]);
+  }, [userId, isMonitoringServers]);
 
   const sortByHealthStatus = (servers: ServerMetrics[]) => {
     const statusPriority = {
@@ -289,13 +276,14 @@ export function ServerManager() {
             onFilterChange={setActiveFilter}
             counts={statusCounts}
           />
-          <DialogTrigger asChild>
+          <div></div>
+          {/* <DialogTrigger asChild>
             <Button onClick={() => setFormData({ servername: "", hostname: "", ip_address: "" })}>
               <Plus className="mr-2 h-6 w-6" />
               Add Server
             </Button>
-          </DialogTrigger>
-          <DialogContent>
+          </DialogTrigger> */}
+          {/* <DialogContent>
             <DialogHeader>
               <DialogTitle className="text-center">Add New Server</DialogTitle>
             </DialogHeader>
@@ -338,7 +326,7 @@ export function ServerManager() {
                 {isLoading ? "Adding..." : "Add Server"}
               </Button>
             </form>
-          </DialogContent>
+          </DialogContent> */}
         </Dialog>
 
         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -375,18 +363,18 @@ export function ServerManager() {
             rounded-full border-[2.5px] transition-all duration-500 ease-in-out
             transform hover:scale-102 group relative backdrop-blur-sm
             text-xs
-            ${is_Monitoring_websites
+            ${isMonitoringServers
               ? "border-emerald-400/50 bg-gradient-to-r from-emerald-500/90 to-green-400/90 text-white shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:from-emerald-400 hover:to-green-300"
               : "border-zinc-300/50 bg-gradient-to-r from-zinc-100/90 to-slate-50/90 text-zinc-700 shadow-zinc-300/20 hover:shadow-zinc-300/40 hover:from-zinc-200 hover:to-slate-100"
             }
           `}
-          onClick={() => setis_Monitoring_websites((prev) => !prev)}
+          onClick={() => setIsMonitoringServers((prev) => !prev)}
         >
           {/* Glow */}
           <div
             className={`
               absolute inset-0 rounded-full blur-xl transition-opacity duration-500
-              ${is_Monitoring_websites ? "opacity-40 bg-emerald-400" : "opacity-0 bg-zinc-400"}
+              ${isMonitoringServers ? "opacity-40 bg-emerald-400" : "opacity-0 bg-zinc-400"}
             `}
           />
 
@@ -395,7 +383,7 @@ export function ServerManager() {
             <div
               className={`
                 w-10 h-6 rounded-full transition-all duration-500 flex items-center
-                ${is_Monitoring_websites
+                ${isMonitoringServers
                   ? "bg-emerald-400/20 border-white/30"
                   : "bg-zinc-200/50 border-zinc-300/30"
                 }
@@ -405,17 +393,17 @@ export function ServerManager() {
               <div
                 className={`
                   absolute w-4 h-4 rounded-full shadow-md transition-all duration-500 flex items-center justify-center
-                  ${is_Monitoring_websites ? "translate-x-5 bg-white" : "translate-x-1 bg-zinc-400"}
+                  ${isMonitoringServers ? "translate-x-5 bg-white" : "translate-x-1 bg-zinc-400"}
                 `}
               >
                 <div
-                  className={`absolute inset-0 rounded-full ${is_Monitoring_websites ? "animate-ping bg-white/50" : ""
+                  className={`absolute inset-0 rounded-full ${isMonitoringServers ? "animate-ping bg-white/50" : ""
                     }`}
                 />
                 <div
                   className={`
                     w-1.5 h-1.5 rounded-full transition-all duration-500
-                    ${is_Monitoring_websites ? "bg-emerald-500 scale-100" : "bg-zinc-500 scale-0"}
+                    ${isMonitoringServers ? "bg-emerald-500 scale-100" : "bg-zinc-500 scale-0"}
                   `}
                 />
               </div>
@@ -423,7 +411,7 @@ export function ServerManager() {
           </div>
 
           <span className="relative font-medium tracking-wide text-xs flex items-center gap-2">
-            {is_Monitoring_websites ? (
+            {isMonitoringServers ? (
               <>
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                 <span className="animate-gradient-text bg-gradient-to-r from-white to-emerald-100">
@@ -437,7 +425,7 @@ export function ServerManager() {
 
           {/* Decorative circles */}
           <div className="absolute -z-10 inset-0 overflow-hidden rounded-full">
-            {is_Monitoring_websites && (
+            {isMonitoringServers && (
               <>
                 <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-emerald-300/20 blur-md animate-pulse" />
                 <div className="absolute -bottom-3 -left-3 w-6 h-6 rounded-full bg-green-300/20 blur-md animate-pulse delay-100" />
@@ -498,11 +486,11 @@ export function ServerManager() {
                 setSelectedServerName(server.server_name);
                 setConfirmOpen(true);
               }}
-              isMonitoring={is_Monitoring_websites}
+              isMonitoring={isMonitoringServers}
             />
           ))
         )}
       </div>
     </div>
   );
-} 
+}

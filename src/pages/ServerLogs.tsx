@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input"
 
 import { Chart } from 'react-chartjs-2';
 
@@ -84,13 +85,16 @@ export default function ServerLogs() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
   const [logs, setLogs] = useState<ServerMonitoringLog[]>([]);
+  const [chartLogs, setChartLogs] = useState<ServerMonitoringLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('cpu_percent');
 
   const urlParams = new URLSearchParams(location.search);
   const serverName = urlParams.get('name') || location.state?.serverName || "Server";
-  
+
   const [chartTimeFilter, setChartTimeFilter] = useState<ChartTimeFilterType>('1h');
   const [logTimeFilter, setLogTimeFilter] = useState<LogTimeFilterType>('1h');
   const [showChartUnhappyOnly, setShowChartUnhappyOnly] = useState<boolean>(false);
@@ -105,34 +109,26 @@ export default function ServerLogs() {
 
   const getTimelineChartFilteredLogs = useCallback(() => {
     const now = new Date();
-    let chartLogs = logs.filter(log => {
+    let filtered = chartLogs.filter(log => {
       if (!log.checked_at) return false;
       const logDate = new Date(log.checked_at);
       if (isNaN(logDate.getTime())) return false;
-
       const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
-
       switch (chartTimeFilter) {
-        case '1h':
-          return diffInHours <= 1;
-        case '6h':
-          return diffInHours <= 6;
-        case '12h':
-          return diffInHours <= 12;
-        case '24h':
-          return diffInHours <= 24;
-        default:
-          return diffInHours <= 1;
+        case '1h': return diffInHours <= 1;
+        case '6h': return diffInHours <= 6;
+        case '12h': return diffInHours <= 12;
+        case '24h': return diffInHours <= 24;
+        default: return diffInHours <= 1;
       }
     });
-
     if (showChartUnhappyOnly) {
-      chartLogs = chartLogs.filter(log => log.health_status.toLowerCase() !== 'healthy');
+      filtered = filtered.filter(log => log.health_status.toLowerCase() !== 'healthy');
     }
-    return chartLogs;
-  }, [logs, chartTimeFilter, showChartUnhappyOnly]);
+    return filtered;
+  }, [chartLogs, chartTimeFilter, showChartUnhappyOnly]);
 
-  const fetchLogs = async () => {
+  const fetchChartLogs = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -141,10 +137,33 @@ export default function ServerLogs() {
         .eq("server_name", serverName)
         .order("checked_at", { ascending: false });
       if (error) throw error;
-      
+      setChartLogs(data || []);
+    } catch (error) {
+      console.error("Error fetching chart logs:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [serverName]);
+
+  // Fetch logs data (for table, with date filtering)
+  const fetchTableLogs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      let query = supabase
+        .from("server_metrics")
+        .select("*")
+        .eq("server_name", serverName)
+        .order("checked_at", { ascending: false });
+
+      // Apply date filters if set
+      if (fromDate) query = query.gte("checked_at", new Date(fromDate).toISOString());
+      if (toDate) query = query.lte("checked_at", new Date(toDate + "T23:59:59").toISOString());
+
+      const { data, error } = await query;
+      if (error) throw error;
       setLogs(data || []);
-      
       setCurrentPage(1);
+
       if (data) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
         const statusesFromLogs = Array.from(new Set(data.map(log => log.health_status))).sort();
@@ -153,7 +172,6 @@ export default function ServerLogs() {
           if (b === "all") return 1;
           return a.localeCompare(b);
         });
-        // console.log(combinedStatuses);
         setUniqueHealthStatuses(combinedStatuses);
       }
     } catch (error) {
@@ -161,43 +179,55 @@ export default function ServerLogs() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [serverName, fromDate, toDate]);
+
+  // Fetch chart logs and table logs on mount and when dependencies change
+  useEffect(() => {
+    fetchChartLogs();
+  }, [fetchChartLogs, chartTimeFilter, showChartUnhappyOnly, selectedMetric]);
+
+  useEffect(() => {
+    fetchTableLogs();
+  }, [fetchTableLogs, logTimeFilter, selectedHealthStatus, showErrorsOnly, fromDate, toDate]);
 
   const getFilteredLogs = () => {
-    const now = new Date();
+    let filtered = logs;
 
-    let filtered = logs.filter(log => {
-      if (!log.checked_at) return false;
-      const logDate = new Date(log.checked_at);
-      if (isNaN(logDate.getTime())) return false;
+    // Date range filter
+    if (fromDate) {
+      filtered = filtered.filter(log => new Date(log.checked_at) >= new Date(fromDate));
+    }
+    if (toDate) {
+      const toDateObj = new Date(toDate + "T23:59:59");
+      filtered = filtered.filter(log => new Date(log.checked_at) <= toDateObj);
+    }
 
-      const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
-
-      switch (logTimeFilter) {
-        case '1h':
-          return diffInHours <= 1;
-        case '6h':
-          return diffInHours <= 6;
-        case '12h':
-          return diffInHours <= 12;
-        case '24h':
-          return diffInHours <= 24;
-        default:
-          return diffInHours <= 1;
-      }
-    });
+    // Time filter (if no from/to date, fallback to hour-based)
+    if (!fromDate && !toDate) {
+      const now = new Date();
+      filtered = filtered.filter(log => {
+        if (!log.checked_at) return false;
+        const logDate = new Date(log.checked_at);
+        if (isNaN(logDate.getTime())) return false;
+        const diffInHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
+        switch (logTimeFilter) {
+          case '1h': return diffInHours <= 1;
+          case '6h': return diffInHours <= 6;
+          case '12h': return diffInHours <= 12;
+          case '24h': return diffInHours <= 24;
+          default: return diffInHours <= 1;
+        }
+      });
+    }
 
     if (selectedHealthStatus !== "all") {
       filtered = filtered.filter(log => log.health_status === selectedHealthStatus);
     }
-
     if (showErrorsOnly) {
       filtered = filtered.filter(log => !!log.error_message);
     }
-
     return filtered;
   };
-
   const getPaginatedLogs = () => {
     const filtered = getFilteredLogs();
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -366,10 +396,6 @@ export default function ServerLogs() {
 
   const noDataForChart = getTimelineChartFilteredLogs().length === 0;
 
-  useEffect(() => {
-    fetchLogs();
-  }, [id]);
-
   const exportToCSV = () => {
     const headers = [
       "Checked At",
@@ -424,6 +450,12 @@ export default function ServerLogs() {
         return <Activity className="h-4 w-4 text-gray-500" />;
     }
   };
+  const resetFilters = () => {
+    setFromDate("");
+    setToDate("");
+    setLogTimeFilter("1h");
+    setSelectedHealthStatus("all");
+  };
 
   return (
     <DashboardLayout>
@@ -456,7 +488,9 @@ export default function ServerLogs() {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchLogs}
+              onClick={() => {
+                fetchChartLogs(); fetchTableLogs();
+              }}
               disabled={isLoading}
               className="gap-2"
             >
@@ -567,7 +601,7 @@ export default function ServerLogs() {
             </div>
 
             <div className="px-1 py-4 border-t border-b">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
                 <div className="sm:col-span-1">
                   <Label htmlFor="healthStatusFilter" className="text-xs font-medium text-muted-foreground">Filter by Health Status</Label>
                   <Select value={selectedHealthStatus} onValueChange={setSelectedHealthStatus}>
@@ -585,11 +619,15 @@ export default function ServerLogs() {
                 </div>
                 <div className="sm:col-span-1">
                   <Label htmlFor="logTimeFilter" className="text-xs font-medium text-muted-foreground">Filter Logs by Time</Label>
-                  <Select value={logTimeFilter} onValueChange={(value) => {
-                    console.log("value changed for logtimefilter ",value);
-                    setLogTimeFilter(value as LogTimeFilterType);
-                    console.log("log time filter ", logTimeFilter);
-                  }}>
+                  <Select 
+                    value={logTimeFilter} 
+                    onValueChange={(value) => {
+                      console.log("value changed for logtimefilter ", value);
+                      setLogTimeFilter(value as LogTimeFilterType);
+                      console.log("log time filter ", logTimeFilter);
+                    }}
+                    disabled={!!fromDate || !!toDate}
+                  >
                     <SelectTrigger id="logTimeFilter" className="h-9 mt-1">
                       <SelectValue placeholder="Select time range" />
                     </SelectTrigger>
@@ -602,7 +640,43 @@ export default function ServerLogs() {
                   </Select>
                 </div>
 
-                <div className="flex items-center space-x-2 justify-self-start sm:col-span-1">
+                <div className="flex items-end gap-2 sm:col-span-1">
+                  <div>
+                    <Label htmlFor="fromDate" className="text-xs font-medium text-muted-foreground">From</Label>
+                    <Input
+                      id="fromDate"
+                      type="date"
+                      value={fromDate}
+                      onChange={e => setFromDate(e.target.value)}
+                      className="h-9 mt-1"
+                      max={toDate || undefined}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="toDate" className="text-xs font-medium text-muted-foreground">To</Label>
+                    <Input
+                      id="toDate"
+                      type="date"
+                      value={toDate}
+                      onChange={e => setToDate(e.target.value)}
+                      className="h-9 mt-1"
+                      min={fromDate || undefined}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-22 p-4 ml-1 bg-gray-200"
+                    onClick={resetFilters}
+                  >
+                    Reset Filters
+                  </Button>
+                </div>
+                
+                
+
+
+                <div className="flex items-center mr-4 space-x-2 justify-end sm:col-span-1">
                   <Switch
                     id="showErrorsOnly"
                     checked={showErrorsOnly}
