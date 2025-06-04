@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 interface ServerMetrics {
   id: string;
+  server_name: string;
   hostname: string;
   ip_address: string;
   health_status: string;
@@ -21,41 +22,41 @@ export const useServersByStatus = (healthStatus?: string) => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchServersByStatus = async (status?: string) => {
-  setLoading(true);
-  setError(null);
+    console.log("inside the hook servers by status");
+    setLoading(true);
+    setError(null);
 
-  try {
-    let query = supabase
-      .from("server_metrics")
-      .select("*")
-      .order("hostname", { ascending: true });
+    try {
+      // Call the RPC to get latest unique servers
+      const { data, error } = await supabase.rpc("get_latest_unique_servers");
+      console.log("data from fetchServersByStatus:", data);
+      if (error) throw error;
 
-    if (status && status.toLowerCase() !== "all") {
-      query = query.eq("health_status", status);
+      // Apply status filter if status is provided
+      const filteredData = status
+        ? data.filter((server: ServerMetrics) => server.health_status === status)
+        : data;
+
+      // Keep only unique server_name entries
+      const uniqueServers: ServerMetrics[] = [];
+      const seenServerNames = new Set<string>();
+
+      (filteredData || []).forEach((server: ServerMetrics) => {
+        if (server.server_name && !seenServerNames.has(server.server_name)) {
+          uniqueServers.push(server);
+          seenServerNames.add(server.server_name);
+        }
+      });
+
+      setServers(uniqueServers);
+    } catch (error: any) {
+      console.error("Error fetching servers by status:", error);
+      setError(error.message || "Failed to fetch servers");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    // Filter for unique hostnames (keep first occurrence)
-    const uniqueServers: ServerMetrics[] = [];
-    const seenHostnames = new Set<string>();
-    (data || []).forEach((server: ServerMetrics) => {
-      if (server.ip_address && !seenHostnames.has(server.ip_address)) {
-        uniqueServers.push(server);
-        seenHostnames.add(server.ip_address);
-      }
-    });
-
-    setServers(uniqueServers);
-  } catch (error) {
-    console.error("Error fetching servers by status:", error);
-    setError(error.message || "Failed to fetch servers");
-  } finally {
-    setLoading(false);
-  }
-};
 
   useEffect(() => {
     fetchServersByStatus(healthStatus);

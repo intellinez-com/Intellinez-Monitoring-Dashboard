@@ -17,7 +17,7 @@ import { ServerStatusFilter } from "../components/ServerStatusFilter";
 import { ServerCardSkeleton } from "../components/ServerCardSkeleton";
 
 interface ServerMetrics {
-  id: string;
+  server_name: string;
   hostname: string;
   detected_hostname: string | null;
   ip_address: string;
@@ -43,12 +43,10 @@ export function ServerManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [selectedServerHostname, setSelectedServerHostname] = useState<string | null>(null);
+  const [selectedServerName, setSelectedServerName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [isUpdateOpen, setIsUpdateOpen] = useState(false);
-  const [serverToUpdate, setServerToUpdate] = useState<ServerMetrics | null>(null);
   const [activeFilter, setActiveFilter] = useState<
     "All" | "Healthy" | "Degraded" | "Offline" | "Intermittent"
   >("All");
@@ -62,14 +60,11 @@ export function ServerManager() {
   }, [is_Monitoring_websites]);
 
   const [formData, setFormData] = useState({
+    servername: "",
     hostname: "",
     ip_address: "",
   });
 
-  const [UpdateformData, setUpdateFormData] = useState({
-    hostname: "",
-    ip_address: "",
-  });
 
   const { user } = useUser();
   const userId = user?.id;
@@ -96,19 +91,25 @@ export function ServerManager() {
         throw new Error("Please enter a valid IP address");
       }
 
+      if (!formData.servername.trim()) {
+        throw new Error("Please enter a server name.");
+      }
+
       // Check if the server already exists
       const { data: existingServer, error: fetchError } = await supabase
         .from("server_metrics")
-        .select("id")
+        .select("server_name")
         .eq("hostname", formData.hostname)
-        .eq("ip_address", formData.ip_address);
+        .eq("ip_address", formData.ip_address)
+        .eq("server_name", formData.servername);
 
       if (fetchError) throw fetchError;
       if (existingServer && existingServer.length > 0) {
-        throw new Error("A server with this hostname and IP already exists");
+        throw new Error("A server with these details already exists");
       }
 
       const newServer = {
+        server_name: formData.servername,
         hostname: formData.hostname,
         ip_address: formData.ip_address,
         health_status: "Offline",
@@ -128,7 +129,7 @@ export function ServerManager() {
         setServers((prev) => [data[0], ...prev]);
       }
 
-      setFormData({ hostname: "", ip_address: "" });
+      setFormData({ servername: "", hostname: "", ip_address: "" });
       setIsOpen(false);
 
       toast({
@@ -152,12 +153,8 @@ export function ServerManager() {
     setIsOpen(open);
   };
 
-  const handleUpdateDialogOpen = (open: boolean) => {
-    setIsUpdateOpen(open);
-  };
-
   const confirmDelete = async () => {
-    if (!selectedServerHostname || isDeleting) return;
+    if (!setSelectedServerName || isDeleting) return;
 
     setIsDeleting(true);
 
@@ -165,19 +162,19 @@ export function ServerManager() {
       const { error } = await supabase
         .from("server_metrics")
         .delete()
-        .eq("hostname", selectedServerHostname);
+        .eq("server_name", selectedServerName);
 
       if (error) throw error;
       // Remove color mapping from localStorage
       try {
-        if (selectedServerHostname) {
-          localStorage.removeItem(`server-color-${selectedServerHostname}`);
+        if (selectedServerName) {
+          localStorage.removeItem(`server-color-${selectedServerName}`);
         }
       } catch (e) {
         // Ignore localStorage errors
       }
       setServers((servers) =>
-        servers.filter((server) => server.id !== selectedServerHostname)
+        servers.filter((server) => server.server_name !== selectedServerName)
       );
       toast({
         title: "Success",
@@ -185,7 +182,7 @@ export function ServerManager() {
         variant: "success",
       });
       setConfirmOpen(false);
-      setSelectedServerHostname(null);
+      setSelectedServerName(null);
     } catch (error) {
       toast({
         title: "Error",
@@ -197,95 +194,20 @@ export function ServerManager() {
     }
   };
 
-  const handleUpdate = (server: ServerMetrics) => {
-    setServerToUpdate(server);
-    setUpdateFormData({
-      hostname: server.hostname,
-      ip_address: server.ip_address,
-    });
-    setIsUpdateOpen(true);
-  };
-
-  const handleUpdateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!serverToUpdate) return;
-
-    setIsLoading(true);
-    try {
-      if (UpdateformData.hostname.trim() === "") {
-        throw new Error("Please enter a valid hostname");
-      }
-
-      if (!UpdateformData.ip_address.trim()) {
-        throw new Error("Please enter a valid IP address");
-      }
-
-      const { data, error } = await supabase
-        .from("server_metrics")
-        .update({
-          hostname: UpdateformData.hostname,
-          ip_address: UpdateformData.ip_address,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", serverToUpdate.id)
-        .select();
-
-      if (error) throw error;
-
-      if (data?.[0]) {
-        setServers((prev) =>
-          prev.map((server) =>
-            server.id === serverToUpdate.id ? data[0] : server
-          )
-        );
-        toast({
-          title: "Success",
-          description: "Server updated successfully",
-          variant: "success",
-        });
-      }
-
-      setIsUpdateOpen(false);
-      setServerToUpdate(null);
-      setUpdateFormData({ hostname: "", ip_address: "" });
-    } catch (error) {
-      console.error("Error updating server:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Could not update server",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const fetchServers = async () => {
     if (!userId) return;
 
-    let freshData = [];
+    let freshData: ServerMetrics[] = [];
 
     try {
-      setIsLoading((prev) => (!prev ? true : prev));
+      setIsLoading(true);
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const { data, error } = await supabase
-        .from("server_metrics")
-        .select("*")
-        .order("created_at", { ascending: false });
-
+      const { data, error } = await supabase.rpc("get_latest_unique_servers");
+      // console.log(data);
       if (error) throw error;
-      // Filter for unique detected_hostname
-      const uniqueServers: ServerMetrics[] = [];
-      const seenIpAddress = new Set<string>();
-      (data || []).forEach((server: ServerMetrics) => {
-        if (server.ip_address && !seenIpAddress.has(server.ip_address)) {
-          uniqueServers.push(server);
-          seenIpAddress.add(server.ip_address);
-        }
-      });
 
-      freshData = uniqueServers;
+      freshData = data || [];
     } catch (error) {
       console.error("Error fetching servers:", error);
       toast({
@@ -294,7 +216,7 @@ export function ServerManager() {
         variant: "destructive",
       });
     }
-
+    // console.log(freshData);
     setServers((prev) => {
       if (JSON.stringify(prev) !== JSON.stringify(freshData)) {
         return freshData;
@@ -305,6 +227,7 @@ export function ServerManager() {
     setLastUpdated(new Date());
     setTimeout(() => setIsLoading(false), 200);
   };
+
 
   useEffect(() => {
     fetchServers();
@@ -367,7 +290,7 @@ export function ServerManager() {
             counts={statusCounts}
           />
           <DialogTrigger asChild>
-            <Button onClick={() => setFormData({ hostname: "", ip_address: "" })}>
+            <Button onClick={() => setFormData({ servername: "", hostname: "", ip_address: "" })}>
               <Plus className="mr-2 h-6 w-6" />
               Add Server
             </Button>
@@ -377,6 +300,17 @@ export function ServerManager() {
               <DialogTitle className="text-center">Add New Server</DialogTitle>
             </DialogHeader>
             <form className="space-y-4" onSubmit={handleNewServerSubmit}>
+              <label className="block text-sm font-medium text-gray-700 ml-1">
+                Server Name<span className="text-red-500">*</span>
+              </label>
+              <Input
+                placeholder="Enter server name here"
+                value={formData.servername}
+                onChange={(e) =>
+                  setFormData({ ...formData, servername: e.target.value })
+                }
+                required
+              />
               <label className="block text-sm font-medium text-gray-700 ml-1">
                 Hostname<span className="text-red-500">*</span>
               </label>
@@ -561,63 +495,14 @@ export function ServerManager() {
               key={server.hostname}
               server={server}
               onDelete={() => {
-                setSelectedServerHostname(server.hostname);
+                setSelectedServerName(server.server_name);
                 setConfirmOpen(true);
               }}
-              onUpdate={() => handleUpdate(server)}
               isMonitoring={is_Monitoring_websites}
             />
           ))
         )}
       </div>
-
-      <Dialog open={isUpdateOpen} onOpenChange={handleUpdateDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Server</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleUpdateSubmit} className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700 ml-1">
-              Hostname<span className="text-red-500">*</span>
-            </label>
-            <Input
-              placeholder="Hostname"
-              value={UpdateformData.hostname}
-              onChange={(e) =>
-                setUpdateFormData({ ...UpdateformData, hostname: e.target.value })
-              }
-              required
-            />
-            <label className="block text-sm font-medium text-gray-700 mt-2 ml-1">
-              IP Address<span className="text-red-500">*</span>
-            </label>
-            <Input
-              placeholder="IP Address"
-              value={UpdateformData.ip_address}
-              onChange={(e) =>
-                setUpdateFormData({ ...UpdateformData, ip_address: e.target.value })
-              }
-              required
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setIsUpdateOpen(false);
-                  setServerToUpdate(null);
-                  setUpdateFormData({ hostname: "", ip_address: "" });
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Updating..." : "Update Server"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 } 

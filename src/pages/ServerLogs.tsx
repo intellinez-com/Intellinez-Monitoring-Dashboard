@@ -61,7 +61,7 @@ ChartJS.register(
 
 interface ServerMonitoringLog {
   id: string;
-  server_id: string;
+  server_name: string;
   cpu_percent: number | null;
   memory_percent: number | null;
   disk_percent: number | null;
@@ -90,7 +90,7 @@ export default function ServerLogs() {
 
   const urlParams = new URLSearchParams(location.search);
   const serverName = urlParams.get('name') || location.state?.serverName || "Server";
-
+  
   const [chartTimeFilter, setChartTimeFilter] = useState<ChartTimeFilterType>('1h');
   const [logTimeFilter, setLogTimeFilter] = useState<LogTimeFilterType>('1h');
   const [showChartUnhappyOnly, setShowChartUnhappyOnly] = useState<boolean>(false);
@@ -138,13 +138,12 @@ export default function ServerLogs() {
       const { data, error } = await supabase
         .from("server_metrics")
         .select("*")
-        .eq("hostname", serverName)
+        .eq("server_name", serverName)
         .order("checked_at", { ascending: false });
       if (error) throw error;
-      // console.log(`logs data of ${serverName} :  ${data}`);
+      
       setLogs(data || []);
-      // console.log(`data of ${serverName} :  ${logs}`);
-
+      
       setCurrentPage(1);
       if (data) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
