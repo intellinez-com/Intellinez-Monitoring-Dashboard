@@ -29,7 +29,7 @@ export const useServersByStatus = (healthStatus?: string) => {
     try {
       // Call the RPC to get latest unique servers
       const { data, error } = await supabase.rpc("get_latest_unique_servers");
-      console.log("data from fetchServersByStatus:", data);
+      
       if (error) throw error;
 
       // Apply status filter if status is provided

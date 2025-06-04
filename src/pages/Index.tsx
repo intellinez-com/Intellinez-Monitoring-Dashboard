@@ -124,7 +124,7 @@ const getOrGenerateWebsiteColorMap = (websites: string[]): Record<string, string
 };
 
 const Index = () => {
-  const [loading, setLoading] = useState(true);
+  const [websiteLoading, setWebsiteLoading] = useState(true);
   const [websiteMonitoringData, setWebsiteMonitoringData] = useState<MonitoringLog[]>([]);
   const { getChartData, getMetricsConfig } = useServerMetrics();
 
@@ -161,13 +161,13 @@ const Index = () => {
     } catch (error) {
       console.error("Error fetching monitoring data:", error);
     } finally {
-      setLoading(false);
+      setWebsiteLoading(false);
     }
-  }, []);
+  }, [websiteLoading]);
 
   // Debounce the fetch function to prevent too frequent updates
   const debouncedFetch = useMemo(
-    () => debounce(fetchMonitoringData, 1000, { leading: true, trailing: true }),
+    () => debounce(fetchMonitoringData, 10000, { leading: true, trailing: true }),
     [fetchMonitoringData]
   );
 
