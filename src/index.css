@@ -123,3 +123,7 @@
 .animate-shimmer {
   animation: shimmer 1.5s infinite;
 }
+
+.recharts-legend-item {
+  cursor: pointer;
+}
