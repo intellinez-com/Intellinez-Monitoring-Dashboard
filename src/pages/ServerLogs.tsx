@@ -102,13 +102,17 @@ export default function ServerLogs() {
   const [showChartUnhappyOnly, setShowChartUnhappyOnly] =
     useState<boolean>(false);
 
-  const [selectedHealthStatus, setSelectedHealthStatus] = useState<string>("all");
+  const [selectedHealthStatus, setSelectedHealthStatus] =
+    useState<string>("all");
   const [showErrorsOnly, setShowErrorsOnly] = useState<boolean>(false);
 
-  const [uniqueHealthStatuses, setUniqueHealthStatuses] = useState<string[]>([]);
+  const [uniqueHealthStatuses, setUniqueHealthStatuses] = useState<string[]>(
+    []
+  );
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(20);
+  const [itemsPerPage] = useState<number>(60);
+  const [totalLogsCount, setTotalLogsCount] = useState<number>(0);
 
   const getTimelineChartFilteredLogs = useCallback(() => {
     const now = new Date();
@@ -142,150 +146,279 @@ export default function ServerLogs() {
   const fetchChartLogs = useCallback(async () => {
     setIsLoading(true);
     try {
+      const now = new Date();
+      let hoursAgo = 1;
+      switch (chartTimeFilter) {
+        case "6h":
+          hoursAgo = 6;
+          break;
+        case "12h":
+          hoursAgo = 12;
+          break;
+        case "24h":
+          hoursAgo = 24;
+          break;
+        default:
+          hoursAgo = 1;
+      }
+      const startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+
       const { data, error } = await supabase
         .from("server_metrics")
         .select("*")
         .eq("server_name", serverName)
+        .gte("checked_at", startTime.toISOString())
         .order("checked_at", { ascending: false });
+
       if (error) throw error;
       setChartLogs(data || []);
     } catch (error) {
-      console.error("Error fetching chart logs:", error);
+      console.error("Error fetching chart data:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [serverName]);
+  }, [serverName, chartTimeFilter]);
 
-  // Fetch logs data (for table, with date filtering)
-  const fetchTableLogs = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      let query = supabase
-        .from("server_metrics")
-        .select("*")
-        .eq("server_name", serverName)
-        .order("checked_at", { ascending: false });
+  const fetchTableLogs = useCallback(
+    async (page: number) => {
+      setIsLoading(true);
+      try {
+        const now = new Date();
+        let hoursAgo = 1;
+        switch (logTimeFilter) {
+          case "6h":
+            hoursAgo = 6;
+            break;
+          case "12h":
+            hoursAgo = 12;
+            break;
+          case "24h":
+            hoursAgo = 24;
+            break;
+          default:
+            hoursAgo = 1;
+        }
 
-      // Apply date filters if set
-      if (fromDate)
-        query = query.gte("checked_at", new Date(fromDate).toISOString());
-      if (toDate)
-        query = query.lte(
-          "checked_at",
-          new Date(toDate + "T23:59:59").toISOString()
-        );
+        let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+        let endTime = now;
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setLogs(data || []);
-      setCurrentPage(1);
+        if (fromDate) {
+          startTime = new Date(fromDate);
+          startTime.setHours(0, 0, 0, 0);
+        }
+        if (toDate) {
+          endTime = new Date(toDate + "T23:59:59.999Z");
+        }
 
-      if (data) {
-        const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
-        const statusesFromLogs = Array.from(
-          new Set(data.map((log) => log.health_status))
-        ).sort();
-        const combinedStatuses = Array.from(
-          new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
-        ).sort((a, b) => {
-          if (a === "all") return -1;
-          if (b === "all") return 1;
-          return a.localeCompare(b);
-        });
-        setUniqueHealthStatuses(combinedStatuses);
+        const startIndex = (page - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage - 1;
+
+        let countQuery = supabase
+          .from("server_metrics")
+          .select("*", { count: "exact", head: true })
+          .eq("server_name", serverName)
+          .gte("checked_at", startTime.toISOString())
+          .lte("checked_at", endTime.toISOString());
+
+        let dataQuery = supabase
+          .from("server_metrics")
+          .select("*")
+          .eq("server_name", serverName)
+          .gte("checked_at", startTime.toISOString())
+          .lte("checked_at", endTime.toISOString());
+
+        if (selectedHealthStatus !== "all") {
+          countQuery = countQuery.eq("health_status", selectedHealthStatus);
+          dataQuery = dataQuery.eq("health_status", selectedHealthStatus);
+        }
+
+        if (showErrorsOnly) {
+          const errorFilter = `health_status.not.eq.Healthy`;
+          countQuery = countQuery.or(errorFilter);
+          dataQuery = dataQuery.or(errorFilter);
+        }
+
+        dataQuery = dataQuery
+          .order("checked_at", { ascending: false })
+          .range(startIndex, endIndex);
+
+        const [{ count, error: countError }, { data, error: dataError }] =
+          await Promise.all([countQuery, dataQuery]);
+
+        if (countError) throw countError;
+        if (dataError) throw dataError;
+
+        setLogs(data || []);
+
+        let displayCount = count || 0;
+
+        if (
+          !fromDate &&
+          !toDate &&
+          selectedHealthStatus === "all" &&
+          !showErrorsOnly
+        ) {
+          const expectedCounts = {
+            "1h": 60,
+            "6h": 360,
+            "12h": 720,
+            "24h": 1440,
+          };
+
+          const expected = expectedCounts[logTimeFilter];
+          const actual = count || 0;
+
+          if (expected && Math.abs(actual - expected) <= 5) {
+            displayCount = expected;
+          }
+        }
+
+        setTotalLogsCount(displayCount);
+
+        if (data && page === 1) {
+          const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
+
+          const { data: distinctStatusData, error: distinctStatusError } =
+            await supabase
+              .from("server_metrics")
+              .select("health_status", { count: "exact", head: false })
+              .eq("server_name", serverName)
+              .gte("checked_at", startTime.toISOString())
+              .lte("checked_at", endTime.toISOString())
+              .then((response) => {
+                if (response.error) throw response.error;
+                const statuses = Array.from(
+                  new Set(response.data.map((log: any) => log.health_status))
+                ).sort();
+                return {
+                  data: statuses.map((s) => ({ health_status: s })),
+                  error: null,
+                };
+              });
+
+          if (distinctStatusError) {
+            console.error(
+              "Error fetching distinct health statuses:",
+              distinctStatusError
+            );
+          }
+
+          const statusesFromLogs = distinctStatusData
+            ? distinctStatusData.map((log: any) => log.health_status)
+            : [];
+
+          const combinedStatuses = Array.from(
+            new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
+          ).sort((a, b) => {
+            if (a === "all") return -1;
+            if (b === "all") return 1;
+            return a.localeCompare(b);
+          });
+
+          setUniqueHealthStatuses(combinedStatuses);
+        }
+      } catch (error) {
+        console.error("Error fetching logs data:", error);
+        setLogs([]);
+        setTotalLogsCount(0);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching logs:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [serverName, fromDate, toDate]);
+    },
+    [
+      serverName,
+      logTimeFilter,
+      fromDate,
+      toDate,
+      itemsPerPage,
+      selectedHealthStatus,
+      showErrorsOnly,
+    ]
+  );
 
-  // Fetch chart logs and table logs on mount and when dependencies change
   useEffect(() => {
     fetchChartLogs();
-  }, [fetchChartLogs, chartTimeFilter, showChartUnhappyOnly, selectedMetric]);
+  }, [fetchChartLogs]);
 
   useEffect(() => {
-    fetchTableLogs();
-  }, [
-    fetchTableLogs,
-    logTimeFilter,
-    selectedHealthStatus,
-    showErrorsOnly,
-    fromDate,
-    toDate,
-  ]);
-
-  const getFilteredLogs = () => {
-    let filtered = logs;
-
-    // Date range filter
-    if (fromDate) {
-      filtered = filtered.filter(
-        (log) => new Date(log.checked_at) >= new Date(fromDate)
-      );
-    }
-    if (toDate) {
-      const toDateObj = new Date(toDate + "T23:59:59");
-      filtered = filtered.filter(
-        (log) => new Date(log.checked_at) <= toDateObj
-      );
-    }
-
-    // Time filter (if no from/to date, fallback to hour-based)
-    if (!fromDate && !toDate) {
-      const now = new Date();
-      filtered = filtered.filter((log) => {
-        if (!log.checked_at) return false;
-        const logDate = new Date(log.checked_at);
-        if (isNaN(logDate.getTime())) return false;
-        const diffInHours =
-          (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
-        switch (logTimeFilter) {
-          case "1h":
-            return diffInHours <= 1;
-          case "6h":
-            return diffInHours <= 6;
-          case "12h":
-            return diffInHours <= 12;
-          case "24h":
-            return diffInHours <= 24;
-          default:
-            return diffInHours <= 1;
-        }
-      });
-    }
-
-    if (selectedHealthStatus !== "all") {
-      filtered = filtered.filter(
-        (log) => log.health_status === selectedHealthStatus
-      );
-    }
-    if (showErrorsOnly) {
-      filtered = filtered.filter(
-        (log) => log.health_status?.toLowerCase() !== "healthy"
-      );
-    }
-    return filtered;
-  };
-
-  const getPaginatedLogs = () => {
-    const filtered = getFilteredLogs();
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return {
-      logs: filtered.slice(startIndex, endIndex),
-      totalCount: filtered.length,
-      totalPages: Math.ceil(filtered.length / itemsPerPage),
-      hasNext: endIndex < filtered.length,
-      hasPrev: currentPage > 1,
-    };
-  };
+    fetchTableLogs(currentPage);
+  }, [fetchTableLogs, currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [logTimeFilter, selectedHealthStatus, showErrorsOnly]);
+  }, [logTimeFilter, selectedHealthStatus, showErrorsOnly, fromDate, toDate]);
+
+  const paginatedLogs = useMemo(() => {
+    const totalPages = Math.ceil(totalLogsCount / itemsPerPage);
+    return {
+      logs: logs,
+      totalCount: totalLogsCount,
+      totalPages: totalPages,
+      hasNext: currentPage < totalPages,
+      hasPrev: currentPage > 1,
+    };
+  }, [logs, currentPage, itemsPerPage, totalLogsCount]);
+
+  const resetFilters = () => {
+    setCurrentPage(1);
+    setFromDate("");
+    setToDate("");
+    setLogTimeFilter("1h");
+    setSelectedHealthStatus("all");
+    setShowErrorsOnly(false);
+  };
+
+  const refreshData = () => {
+    fetchChartLogs();
+    fetchTableLogs(currentPage);
+  };
+
+  const exportToCSV = () => {
+    const headers = [
+      "Checked At",
+      "Health Status",
+      "CPU Usage (%)",
+      "Memory Usage (%)",
+      "Disk Usage (%)",
+      "Running Processes",
+      "Error Message",
+      "Created At",
+    ];
+
+    const csvData = logs.map((log) => [
+      new Date(log.checked_at).toLocaleString(),
+      log.health_status,
+      log.cpu_percent || "N/A",
+      log.memory_percent || "N/A",
+      log.disk_percent || "N/A",
+      log.running_processes || "N/A",
+      log.error_message || "None",
+      new Date(log.created_at).toLocaleString(),
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map((row) =>
+        row
+          .map((cell) =>
+            typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
+          )
+          .join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `${serverName.replace(/\s+/g, "_")}_monitoring_logs.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const prepareTimelineChartData = useCallback(
     (
@@ -462,53 +595,6 @@ export default function ServerLogs() {
 
   const noDataForChart = getTimelineChartFilteredLogs().length === 0;
 
-  const exportToCSV = () => {
-    const headers = [
-      "Checked At",
-      "Health Status",
-      "CPU Usage (%)",
-      "Memory Usage (%)",
-      "Disk Usage (%)",
-      "Running Processes",
-      "Error Message",
-      "Created At",
-    ];
-
-    const csvData = logs.map((log) => [
-      new Date(log.checked_at).toLocaleString(),
-      log.health_status,
-      log.cpu_percent || "N/A",
-      log.memory_percent || "N/A",
-      log.disk_percent || "N/A",
-      log.running_processes || "N/A",
-      log.error_message || "None",
-      new Date(log.created_at).toLocaleString(),
-    ]);
-
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map((row) =>
-        row
-          .map((cell) =>
-            typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
-          )
-          .join(",")
-      ),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `${serverName.replace(/\s+/g, "_")}_monitoring_logs.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const getHealthStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case "healthy":
@@ -521,23 +607,23 @@ export default function ServerLogs() {
         return <Activity className="h-4 w-4 text-gray-500" />;
     }
   };
-  const resetFilters = () => {
-    setFromDate("");
-    setToDate("");
-    setLogTimeFilter("1h");
-    setSelectedHealthStatus("all");
-    setShowErrorsOnly(false);
-  };
 
   const maxDate = useMemo(() => {
-    return new Date().toISOString().split("T")[0]; // Today
+    return new Date().toISOString().split("T")[0];
   }, []);
 
   const minDate = useMemo(() => {
     const date = new Date();
-    date.setDate(date.getDate() - 30); // 30 days ago
+    date.setDate(date.getDate() - 30);
     return date.toISOString().split("T")[0];
   }, []);
+
+  function formatDateLocal(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
 
   return (
     <DashboardLayout>
@@ -573,10 +659,7 @@ export default function ServerLogs() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                fetchChartLogs();
-                fetchTableLogs();
-              }}
+              onClick={refreshData}
               disabled={isLoading}
               className="gap-2"
             >
@@ -750,7 +833,9 @@ export default function ServerLogs() {
                     </Label>
                     <Select
                       value={logTimeFilter}
-                      onValueChange={(value) => setLogTimeFilter(value as LogTimeFilterType)}
+                      onValueChange={(value) =>
+                        setLogTimeFilter(value as LogTimeFilterType)
+                      }
                       disabled={!!fromDate || !!toDate}
                     >
                       <SelectTrigger
@@ -767,7 +852,7 @@ export default function ServerLogs() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex flex-col min-w-[140px]">
+                  <div className="flex flex-col min-w-[180px]">
                     <Label
                       htmlFor="fromDate"
                       className="text-xs font-medium text-muted-foreground mb-1"
@@ -782,13 +867,14 @@ export default function ServerLogs() {
                           if (toDate && date > new Date(toDate)) {
                             setToDate("");
                           }
-                          setFromDate(date.toISOString().split("T")[0]);
+
+                          setFromDate(formatDateLocal(date)); // Use local formatter
                         } else {
                           setFromDate("");
                         }
                       }}
-                      dateFormat="yyyy-MM-dd" // <-- use this format
-                      className="h-9 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
+                      dateFormat="yyyy-MM-dd"
+                      className="h-9 mt-1 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
                       maxDate={toDate ? new Date(toDate) : new Date(maxDate)}
                       minDate={new Date(minDate)}
                       placeholderText="Start date"
@@ -797,7 +883,7 @@ export default function ServerLogs() {
                       popperPlacement="bottom-start"
                     />
                   </div>
-                  <div className="flex flex-col min-w-[140px]">
+                  <div className="flex flex-col min-w-[180px]">
                     <Label
                       htmlFor="toDate"
                       className="text-xs font-medium text-muted-foreground mb-1"
@@ -810,57 +896,91 @@ export default function ServerLogs() {
                       onChange={(date: Date | null) => {
                         if (!fromDate) {
                           // Show a visual indicator instead of alert
+
                           const fromInput = document.getElementById("fromDate");
 
                           if (fromInput) {
                             // Add red border
+
                             fromInput.classList.add("ring-2", "ring-red-400");
 
                             // Create tooltip
+
                             const tooltip = document.createElement("div");
+
                             tooltip.textContent = "Please select start date";
+
                             tooltip.className = `absolute left-0 mt-1 px-2 py-1 text-xs text-white bg-red-500 rounded shadow z-50 animate-fade-in`;
 
                             // Positioning
+
                             const inputRect = fromInput.getBoundingClientRect();
-                            tooltip.style.top = `${fromInput.offsetHeight + 4}px`; // 4px margin
+
+                            tooltip.style.top = `${
+                              fromInput.offsetHeight + 4
+                            }px`; // 4px margin
+
                             tooltip.style.minWidth = "max-content";
 
                             // Attach tooltip to input's parent
+
                             const parent = fromInput.parentElement;
+
                             if (parent) {
                               parent.style.position = "relative"; // ensure positioning
+
                               parent.appendChild(tooltip);
 
                               // Remove both border and tooltip after 1.5s
+
                               setTimeout(() => {
-                                fromInput.classList.remove("ring-2", "ring-red-400");
+                                fromInput.classList.remove(
+                                  "ring-2",
+                                  "ring-red-400"
+                                );
+
                                 tooltip.remove();
                               }, 1500);
                             }
                           }
+
                           return;
                         }
+
                         if (date instanceof Date && !isNaN(date.getTime())) {
-                          // Prevent selecting toDate before fromDate
                           if (fromDate && date < new Date(fromDate)) {
                             const toInput = document.getElementById("toDate");
+
                             if (toInput) {
                               toInput.classList.add("ring-2", "ring-red-400");
+
                               setTimeout(() => {
-                                toInput.classList.remove("ring-2", "ring-red-400");
+                                toInput.classList.remove(
+                                  "ring-2",
+                                  "ring-red-400"
+                                );
                               }, 1500);
                             }
+
                             return;
                           }
-                          setToDate(date.toISOString().split("T")[0]);
+
+                          setToDate(formatDateLocal(date));
                         } else {
                           setToDate("");
                         }
                       }}
                       dateFormat="yyyy-MM-dd"
                       className="h-9 mt-1 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
-                      minDate={fromDate ? new Date(fromDate) : new Date(minDate)}
+                      minDate={
+                        fromDate
+                          ? new Date(
+                              new Date(fromDate).setDate(
+                                new Date(fromDate).getDate() + 1
+                              )
+                            )
+                          : new Date(minDate)
+                      }
                       maxDate={maxDate ? new Date(maxDate) : new Date()}
                       placeholderText="End date"
                       isClearable
@@ -868,6 +988,7 @@ export default function ServerLogs() {
                       popperPlacement="bottom-start"
                     />
                   </div>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -895,12 +1016,12 @@ export default function ServerLogs() {
             </div>
 
             <div className="space-y-4 pt-4">
-              {getPaginatedLogs().logs.length === 0 ? (
+              {paginatedLogs.logs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No monitoring logs found
                 </div>
               ) : (
-                getPaginatedLogs().logs.map((log) => (
+                paginatedLogs.logs.map((log) => (
                   <div
                     key={log.id}
                     className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-sm"
@@ -932,10 +1053,10 @@ export default function ServerLogs() {
                             log.health_status.toLowerCase() === "healthy"
                               ? "text-emerald-600"
                               : log.health_status.toLowerCase() === "degraded"
-                                ? "text-yellow-600"
-                                : log.health_status.toLowerCase() === "offline"
-                                  ? "text-red-600"
-                                  : "text-gray-600"
+                              ? "text-yellow-600"
+                              : log.health_status.toLowerCase() === "offline"
+                              ? "text-red-600"
+                              : "text-gray-600"
                           )}
                         >
                           {log.health_status}
@@ -984,7 +1105,7 @@ export default function ServerLogs() {
 
               <div className="flex items-center justify-between pt-6 pb-2">
                 <div className="text-sm text-gray-600">
-                  Total: {getPaginatedLogs().totalCount} logs
+                  Total: {paginatedLogs.totalCount} logs
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -992,7 +1113,9 @@ export default function ServerLogs() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1 || getPaginatedLogs().totalCount === 0}
+                    disabled={
+                      currentPage === 1 || paginatedLogs.totalCount === 0
+                    }
                     className="gap-1 h-9"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -1001,8 +1124,8 @@ export default function ServerLogs() {
 
                   <div className="flex items-center gap-1">
                     <span className="text-sm">
-                      Page {getPaginatedLogs().totalCount === 0 ? 0 : currentPage} of{" "}
-                      {getPaginatedLogs().totalPages}
+                      Page {paginatedLogs.totalCount === 0 ? 0 : currentPage} of{" "}
+                      {paginatedLogs.totalPages}
                     </span>
                   </div>
 
@@ -1011,7 +1134,8 @@ export default function ServerLogs() {
                     size="sm"
                     onClick={() => setCurrentPage(currentPage + 1)}
                     disabled={
-                      currentPage >= getPaginatedLogs().totalPages || getPaginatedLogs().totalCount === 0
+                      currentPage >= paginatedLogs.totalPages ||
+                      paginatedLogs.totalCount === 0
                     }
                     className="gap-1 h-9"
                   >
