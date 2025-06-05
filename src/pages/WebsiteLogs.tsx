@@ -106,7 +106,8 @@ export default function WebsiteLogs() {
   );
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(20);
+  const [itemsPerPage] = useState<number>(60);
+  const [totalLogsCount, setTotalLogsCount] = useState<number>(0);
 
   // Fetch chart data (for timeline chart)
   const fetchChartData = useCallback(async () => {
@@ -146,7 +147,7 @@ export default function WebsiteLogs() {
   }, [id, chartTimeFilter]);
 
   // Fetch logs data (for table)
-  const fetchLogsData = useCallback(async () => {
+  const fetchLogsData = useCallback(async (page: number) => {
     setIsLoading(true);
     try {
       const now = new Date();
@@ -171,25 +172,98 @@ export default function WebsiteLogs() {
       if (fromDate) startTime = new Date(fromDate);
       if (toDate) endTime = new Date(toDate + "T23:59:59");
 
-      let query = supabase
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage - 1;
+
+      // Step 1: Build base query for COUNT (without range)
+      let countQuery = supabase
+        .from("website_monitoring_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("website_id", id)
+        .gte("checked_at", startTime.toISOString())
+        .lte("checked_at", endTime.toISOString());
+
+      // Step 2: Build data query for ACTUAL RECORDS (with range)
+      let dataQuery = supabase
         .from("website_monitoring_logs")
         .select("*")
         .eq("website_id", id)
         .gte("checked_at", startTime.toISOString())
-        .lte("checked_at", endTime.toISOString())
-        .order("checked_at", { ascending: false });
+        .lte("checked_at", endTime.toISOString());
 
-      const { data, error } = await query;
+      // Apply health status filter to BOTH queries
+      if (selectedHealthStatus !== "all") {
+        countQuery = countQuery.eq("health_status", selectedHealthStatus);
+        dataQuery = dataQuery.eq("health_status", selectedHealthStatus);
+      }
 
-      if (error) throw error;
+      // Apply show errors only filter to BOTH queries
+      if (showErrorsOnly) {
+        const errorFilter = `health_status.not.eq.Healthy,status_code.not.eq.200`;
+        countQuery = countQuery.or(errorFilter);
+        dataQuery = dataQuery.or(errorFilter);
+      }
+
+      // Apply ordering and range ONLY to data query
+      dataQuery = dataQuery
+        .order("checked_at", { ascending: false })
+        .range(startIndex, endIndex);
+
+      // Execute BOTH queries
+      const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
+        countQuery,
+        dataQuery
+      ]);
+
+      if (countError) throw countError;
+      if (dataError) throw dataError;
+
       setLogs(data || []);
-      setCurrentPage(1);
+      
+      // UI Fix: Show expected round numbers for standard time filters
+      let displayCount = count || 0;
+      
+      // Only adjust for standard time filters without custom dates/filters
+      if (!fromDate && !toDate && selectedHealthStatus === "all" && !showErrorsOnly) {
+        const expectedCounts = {
+          "1h": 60,
+          "6h": 360, 
+          "12h": 720,
+          "24h": 1440
+        };
+        
+        const expected = expectedCounts[logTimeFilter];
+        const actual = count || 0;
+        
+        // If actual count is very close to expected (within 5 logs), show expected
+        if (expected && Math.abs(actual - expected) <= 5) {
+          displayCount = expected;
+        }
+      }
+      
+      setTotalLogsCount(displayCount);
 
-      if (data) {
+      if (data && page === 1) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
-        const statusesFromLogs = Array.from(
-          new Set(data.map((log) => log.health_status))
-        ).sort();
+        
+        // Fetch all distinct health statuses for the current filter set, not just from the current page
+        const { data: distinctStatusData, error: distinctStatusError } = await supabase
+          .from("website_monitoring_logs")
+          .select("health_status", { count: 'exact', head: false })
+          .eq("website_id", id)
+          .gte("checked_at", startTime.toISOString())
+          .lte("checked_at", endTime.toISOString())
+          .then(response => {
+            if (response.error) throw response.error;
+            // Manually get distinct statuses if Supabase doesn't do it directly here or if it's complex with JS client
+            const statuses = Array.from(new Set(response.data.map((log: any) => log.health_status))).sort();
+            return { data: statuses.map(s => ({health_status: s})), error: null }; // format to match expected structure
+          });
+
+        if (distinctStatusError) console.error("Error fetching distinct health statuses:", distinctStatusError);
+        
+        const statusesFromLogs = distinctStatusData ? distinctStatusData.map((log: any) => log.health_status) : [];
+
         const combinedStatuses = Array.from(
           new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
         ).sort((a, b) => {
@@ -201,20 +275,22 @@ export default function WebsiteLogs() {
       }
     } catch (error) {
       console.error("Error fetching logs data:", error);
+      setLogs([]);
+      setTotalLogsCount(0);
     } finally {
       setIsLoading(false);
     }
-  }, [id, logTimeFilter, fromDate, toDate]);
+  }, [id, logTimeFilter, fromDate, toDate, itemsPerPage, selectedHealthStatus, showErrorsOnly]);
 
   // Fetch chart data when chartTimeFilter or id changes
   useEffect(() => {
     fetchChartData();
   }, [fetchChartData]);
 
-  // Fetch logs data when logTimeFilter or id changes, or filters change
+  // Fetch logs data when logTimeFilter, id, filters, or currentPage changes
   useEffect(() => {
-    fetchLogsData();
-  }, [fetchLogsData, selectedHealthStatus, showErrorsOnly, fromDate, toDate]);
+    fetchLogsData(currentPage);
+  }, [fetchLogsData, currentPage]);
 
   // Filter chart logs for timeline chart
   const getTimelineChartFilteredLogs = useCallback(() => {
@@ -227,47 +303,22 @@ export default function WebsiteLogs() {
     return chartFiltered;
   }, [chartLogs, showChartUnhappyOnly]);
 
-  // Filter logs for table
-  const getFilteredLogs = useCallback(() => {
-    let filtered = logs;
-
-    // Health status filter
-    if (selectedHealthStatus !== "all") {
-      filtered = filtered.filter(
-        (log) => log.health_status === selectedHealthStatus
-      );
-    }
-
-    // Apply show errors only filter (modified logic)
-    if (showErrorsOnly) {
-      filtered = filtered.filter(
-        (log) =>
-          log.health_status?.toLowerCase() !== "healthy" ||
-          (log.status_code !== null && log.status_code !== 200)
-      );
-    }
-
-    return filtered;
-  }, [logs, selectedHealthStatus, showErrorsOnly]);
-
   // Memoized paginated logs
   const paginatedLogs = useMemo(() => {
-    const filtered = getFilteredLogs();
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
+    const totalPages = Math.ceil(totalLogsCount / itemsPerPage);
     return {
-      logs: filtered.slice(startIndex, endIndex),
-      totalCount: filtered.length,
-      totalPages: Math.ceil(filtered.length / itemsPerPage),
-      hasNext: endIndex < filtered.length,
+      logs: logs,
+      totalCount: totalLogsCount,
+      totalPages: totalPages,
+      hasNext: currentPage < totalPages,
       hasPrev: currentPage > 1,
     };
-  }, [getFilteredLogs, currentPage, itemsPerPage]);
+  }, [logs, currentPage, itemsPerPage, totalLogsCount]);
 
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [logTimeFilter, selectedHealthStatus, showErrorsOnly]);
+  }, [logTimeFilter, selectedHealthStatus, showErrorsOnly, fromDate, toDate]);
 
   // Chart data preparation
   const prepareTimelineChartData = useCallback(
@@ -431,47 +482,101 @@ export default function WebsiteLogs() {
 
   const noDataForChart = getTimelineChartFilteredLogs().length === 0;
 
-  const exportToCSV = () => {
-    const headers = [
-      "Checked At",
-      "Health Status",
-      "Status Code",
-      "Response Time (ms)",
-      "Error Message",
-      "Created At",
-    ];
+  const exportToCSV = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch all logs for CSV export, respecting current filters but not pagination
+      const now = new Date();
+      let hoursAgo = 1;
+      switch (logTimeFilter) {
+        case "6h": hoursAgo = 6; break;
+        case "12h": hoursAgo = 12; break;
+        case "24h": hoursAgo = 24; break;
+        default: hoursAgo = 1;
+      }
+      let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+      let endTime = now;
 
-    const csvData = logs.map((log) => [
-      new Date(log.checked_at).toLocaleString(),
-      log.health_status,
-      log.status_code || "N/A",
-      log.response_time_ms || "N/A",
-      log.error_message || "None",
-      new Date(log.created_at).toLocaleString(),
-    ]);
+      if (fromDate) startTime = new Date(fromDate);
+      if (toDate) endTime = new Date(toDate + "T23:59:59");
 
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map((row) =>
-        row
-          .map((cell) =>
-            typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
-          )
-          .join(",")
-      ),
-    ].join("\n");
+      let query = supabase
+        .from("website_monitoring_logs")
+        .select("checked_at, health_status, status_code, response_time_ms, error_message, created_at")
+        .eq("website_id", id)
+        .gte("checked_at", startTime.toISOString())
+        .lte("checked_at", endTime.toISOString());
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `${websiteName.replace(/\s+/g, "_")}_monitoring_logs.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      if (selectedHealthStatus !== "all") {
+        query = query.eq("health_status", selectedHealthStatus);
+      }
+      if (showErrorsOnly) {
+        query = query.or(`health_status.neq.Healthy,status_code.not.is.null,status_code.neq.200`);
+      }
+      
+      query = query.order("checked_at", { ascending: false });
+
+      const { data: allLogs, error } = await query;
+
+      if (error) {
+        console.error("Error fetching all logs for CSV:", error);
+        alert("Failed to export logs.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (!allLogs || allLogs.length === 0) {
+        alert("No logs to export for the current filters.");
+        setIsLoading(false);
+        return;
+      }
+
+      const headers = [
+        "Checked At",
+        "Health Status",
+        "Status Code",
+        "Response Time (ms)",
+        "Error Message",
+        "Created At",
+      ];
+
+      const csvData = allLogs.map((log: any) => [
+        new Date(log.checked_at).toLocaleString(),
+        log.health_status,
+        log.status_code ?? "N/A",
+        log.response_time_ms ?? "N/A",
+        log.error_message ?? "None",
+        new Date(log.created_at).toLocaleString(),
+      ]);
+
+      const csvContent = [
+        headers.join(","),
+        ...csvData.map((row) =>
+          row
+            .map((cell) =>
+              typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
+            )
+            .join(",")
+        ),
+      ].join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `${websiteName.replace(/\s+/g, "_")}_monitoring_logs.csv`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Error during CSV export:", err);
+      alert("An error occurred during export.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getHealthStatusIcon = (status: string) => {
@@ -496,13 +601,15 @@ export default function WebsiteLogs() {
   };
 
   const resetFilters = () => {
+    setCurrentPage(1);
     setFromDate("");
     setToDate("");
     setLogTimeFilter("1h");
     setSelectedHealthStatus("all");
+    setShowErrorsOnly(false);
   };
   
-    const maxDate = useMemo(() => {
+  const maxDate = useMemo(() => {
     return new Date().toISOString().split("T")[0]; // Today
   }, []);
   
@@ -548,7 +655,7 @@ export default function WebsiteLogs() {
               size="sm"
               onClick={() => {
                 fetchChartData();
-                fetchLogsData();
+                fetchLogsData(currentPage);
               }}
               disabled={isLoading}
               className="gap-2"

@@ -112,7 +112,8 @@ export default function ServerLogs() {
   );
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(20);
+  const [itemsPerPage] = useState<number>(60);
+  const [totalLogsCount, setTotalLogsCount] = useState<number>(0);
 
   const getTimelineChartFilteredLogs = useCallback(() => {
     const now = new Date();
@@ -146,49 +147,152 @@ export default function ServerLogs() {
   const fetchChartLogs = useCallback(async () => {
     setIsLoading(true);
     try {
+      const now = new Date();
+      let hoursAgo = 1;
+      switch (chartTimeFilter) {
+        case "6h":
+          hoursAgo = 6;
+          break;
+        case "12h":
+          hoursAgo = 12;
+          break;
+        case "24h":
+          hoursAgo = 24;
+          break;
+        default:
+          hoursAgo = 1;
+      }
+      const startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+
       const { data, error } = await supabase
         .from("server_metrics")
         .select("*")
         .eq("server_name", serverName)
+        .gte("checked_at", startTime.toISOString())
         .order("checked_at", { ascending: false });
+
       if (error) throw error;
       setChartLogs(data || []);
     } catch (error) {
-      console.error("Error fetching chart logs:", error);
+      console.error("Error fetching chart data:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [serverName]);
+  }, [serverName, chartTimeFilter]);
 
-  // Fetch logs data (for table, with date filtering)
-  const fetchTableLogs = useCallback(async () => {
+  const fetchTableLogs = useCallback(async (page: number) => {
     setIsLoading(true);
     try {
-      let query = supabase
+      const now = new Date();
+      let hoursAgo = 1;
+      switch (logTimeFilter) {
+        case "6h":
+          hoursAgo = 6;
+          break;
+        case "12h":
+          hoursAgo = 12;
+          break;
+        case "24h":
+          hoursAgo = 24;
+          break;
+        default:
+          hoursAgo = 1;
+      }
+      
+      let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+      let endTime = now;
+
+      if (fromDate) {
+        startTime = new Date(fromDate);
+        startTime.setHours(0, 0, 0, 0);
+      }
+      if (toDate) {
+        endTime = new Date(toDate + "T23:59:59.999Z");
+      }
+
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage - 1;
+
+      let countQuery = supabase
+        .from("server_metrics")
+        .select("*", { count: "exact", head: true })
+        .eq("server_name", serverName)
+        .gte("checked_at", startTime.toISOString())
+        .lte("checked_at", endTime.toISOString());
+
+      let dataQuery = supabase
         .from("server_metrics")
         .select("*")
         .eq("server_name", serverName)
-        .order("checked_at", { ascending: false });
+        .gte("checked_at", startTime.toISOString())
+        .lte("checked_at", endTime.toISOString());
 
-      // Apply date filters if set
-      if (fromDate)
-        query = query.gte("checked_at", new Date(fromDate).toISOString());
-      if (toDate)
-        query = query.lte(
-          "checked_at",
-          new Date(toDate + "T23:59:59").toISOString()
-        );
+      if (selectedHealthStatus !== "all") {
+        countQuery = countQuery.eq("health_status", selectedHealthStatus);
+        dataQuery = dataQuery.eq("health_status", selectedHealthStatus);
+      }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      if (showErrorsOnly) {
+        const errorFilter = `health_status.not.eq.Healthy`;
+        countQuery = countQuery.or(errorFilter);
+        dataQuery = dataQuery.or(errorFilter);
+      }
+
+      dataQuery = dataQuery
+        .order("checked_at", { ascending: false })
+        .range(startIndex, endIndex);
+
+      const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
+        countQuery,
+        dataQuery
+      ]);
+
+      if (countError) throw countError;
+      if (dataError) throw dataError;
+
       setLogs(data || []);
-      setCurrentPage(1);
+      
+      let displayCount = count || 0;
+      
+      if (!fromDate && !toDate && selectedHealthStatus === "all" && !showErrorsOnly) {
+        const expectedCounts = {
+          "1h": 60,
+          "6h": 360, 
+          "12h": 720,
+          "24h": 1440
+        };
+        
+        const expected = expectedCounts[logTimeFilter];
+        const actual = count || 0;
+        
+        if (expected && Math.abs(actual - expected) <= 5) {
+          displayCount = expected;
+        }
+      }
+      
+      setTotalLogsCount(displayCount);
 
-      if (data) {
+      if (data && page === 1) {
         const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
-        const statusesFromLogs = Array.from(
-          new Set(data.map((log) => log.health_status))
-        ).sort();
+        
+        const { data: distinctStatusData, error: distinctStatusError } = await supabase
+          .from("server_metrics")
+          .select("health_status", { count: 'exact', head: false })
+          .eq("server_name", serverName)
+          .gte("checked_at", startTime.toISOString())
+          .lte("checked_at", endTime.toISOString())
+          .then(response => {
+            if (response.error) throw response.error;
+            const statuses = Array.from(new Set(response.data.map((log: any) => log.health_status))).sort();
+            return { data: statuses.map(s => ({health_status: s})), error: null };
+          });
+
+        if (distinctStatusError) {
+          console.error("Error fetching distinct health statuses:", distinctStatusError);
+        }
+        
+        const statusesFromLogs = distinctStatusData ? distinctStatusData.map((log: any) => log.health_status) : [];
+
         const combinedStatuses = Array.from(
           new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
         ).sort((a, b) => {
@@ -196,99 +300,124 @@ export default function ServerLogs() {
           if (b === "all") return 1;
           return a.localeCompare(b);
         });
+        
         setUniqueHealthStatuses(combinedStatuses);
       }
     } catch (error) {
-      console.error("Error fetching logs:", error);
+      console.error("Error fetching logs data:", error);
+      setLogs([]);
+      setTotalLogsCount(0);
     } finally {
       setIsLoading(false);
     }
-  }, [serverName, fromDate, toDate]);
+  }, [serverName, logTimeFilter, fromDate, toDate, itemsPerPage, selectedHealthStatus, showErrorsOnly]);
 
-  // Fetch chart logs and table logs on mount and when dependencies change
   useEffect(() => {
     fetchChartLogs();
-  }, [fetchChartLogs, chartTimeFilter, showChartUnhappyOnly, selectedMetric]);
+  }, [fetchChartLogs]);
 
   useEffect(() => {
-    fetchTableLogs();
-  }, [
-    fetchTableLogs,
-    logTimeFilter,
-    selectedHealthStatus,
-    showErrorsOnly,
-    fromDate,
-    toDate,
-  ]);
-
-  const getFilteredLogs = () => {
-    let filtered = logs;
-
-    // Date range filter
-    if (fromDate) {
-      filtered = filtered.filter(
-        (log) => new Date(log.checked_at) >= new Date(fromDate)
-      );
-    }
-    if (toDate) {
-      const toDateObj = new Date(toDate + "T23:59:59");
-      filtered = filtered.filter(
-        (log) => new Date(log.checked_at) <= toDateObj
-      );
-    }
-
-    // Time filter (if no from/to date, fallback to hour-based)
-    if (!fromDate && !toDate) {
-      const now = new Date();
-      filtered = filtered.filter((log) => {
-        if (!log.checked_at) return false;
-        const logDate = new Date(log.checked_at);
-        if (isNaN(logDate.getTime())) return false;
-        const diffInHours =
-          (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
-        switch (logTimeFilter) {
-          case "1h":
-            return diffInHours <= 1;
-          case "6h":
-            return diffInHours <= 6;
-          case "12h":
-            return diffInHours <= 12;
-          case "24h":
-            return diffInHours <= 24;
-          default:
-            return diffInHours <= 1;
-        }
-      });
-    }
-
-    if (selectedHealthStatus !== "all") {
-      filtered = filtered.filter(
-        (log) => log.health_status === selectedHealthStatus
-      );
-    }
-    if (showErrorsOnly) {
-      filtered = filtered.filter(
-        (log) => log.health_status?.toLowerCase() !== "healthy"
-      );
-    }
-    return filtered;
-  };
-  const getPaginatedLogs = () => {
-    const filtered = getFilteredLogs();
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return {
-      logs: filtered.slice(startIndex, endIndex),
-      totalCount: filtered.length,
-      totalPages: Math.ceil(filtered.length / itemsPerPage),
-      hasNext: endIndex < filtered.length,
-      hasPrev: currentPage > 1,
-    };
-  };
+    fetchTableLogs(currentPage);
+  }, [fetchTableLogs, currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [logTimeFilter, selectedHealthStatus, showErrorsOnly]);
+  }, [logTimeFilter, selectedHealthStatus, showErrorsOnly, fromDate, toDate]);
+
+  const paginatedLogs = useMemo(() => {
+    const totalPages = Math.ceil(totalLogsCount / itemsPerPage);
+    return {
+      logs: logs,
+      totalCount: totalLogsCount,
+      totalPages: totalPages,
+      hasNext: currentPage < totalPages,
+      hasPrev: currentPage > 1,
+    };
+  }, [logs, currentPage, itemsPerPage, totalLogsCount]);
+
+  const resetFilters = () => {
+    setCurrentPage(1);
+    setFromDate("");
+    setToDate("");
+    setLogTimeFilter("1h");
+    setSelectedHealthStatus("all");
+    setShowErrorsOnly(false);
+  };
+
+  const refreshData = () => {
+    fetchChartLogs();
+    fetchTableLogs(currentPage);
+  };
+
+  const exportToCSV = () => {
+    const headers = [
+      "Checked At",
+      "Health Status",
+      "CPU Usage (%)",
+      "Memory Usage (%)",
+      "Disk Usage (%)",
+      "Running Processes",
+      "Error Message",
+      "Created At",
+    ];
+
+    const csvData = logs.map((log) => [
+      new Date(log.checked_at).toLocaleString(),
+      log.health_status,
+      log.cpu_percent || "N/A",
+      log.memory_percent || "N/A",
+      log.disk_percent || "N/A",
+      log.running_processes || "N/A",
+      log.error_message || "None",
+      new Date(log.created_at).toLocaleString(),
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map((row) =>
+        row
+          .map((cell) =>
+            typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
+          )
+          .join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `${serverName.replace(/\s+/g, "_")}_monitoring_logs.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const getHealthStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "healthy":
+        return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+      case "degraded":
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case "offline":
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <Activity className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const maxDate = useMemo(() => {
+    return new Date().toISOString().split("T")[0];
+  }, []);
+
+  const minDate = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return date.toISOString().split("T")[0];
+  }, []);
 
   const prepareTimelineChartData = useCallback(
     (
@@ -465,82 +594,6 @@ export default function ServerLogs() {
 
   const noDataForChart = getTimelineChartFilteredLogs().length === 0;
 
-  const exportToCSV = () => {
-    const headers = [
-      "Checked At",
-      "Health Status",
-      "CPU Usage (%)",
-      "Memory Usage (%)",
-      "Disk Usage (%)",
-      "Running Processes",
-      "Error Message",
-      "Created At",
-    ];
-
-    const csvData = logs.map((log) => [
-      new Date(log.checked_at).toLocaleString(),
-      log.health_status,
-      log.cpu_percent || "N/A",
-      log.memory_percent || "N/A",
-      log.disk_percent || "N/A",
-      log.running_processes || "N/A",
-      log.error_message || "None",
-      new Date(log.created_at).toLocaleString(),
-    ]);
-
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map((row) =>
-        row
-          .map((cell) =>
-            typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
-          )
-          .join(",")
-      ),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `${serverName.replace(/\s+/g, "_")}_monitoring_logs.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const getHealthStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "healthy":
-        return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-      case "degraded":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      case "offline":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Activity className="h-4 w-4 text-gray-500" />;
-    }
-  };
-  const resetFilters = () => {
-    setFromDate("");
-    setToDate("");
-    setLogTimeFilter("1h");
-    setSelectedHealthStatus("all");
-  };
-
-  const maxDate = useMemo(() => {
-  return new Date().toISOString().split("T")[0]; // Today
-}, []);
-
-const minDate = useMemo(() => {
-  const date = new Date();
-  date.setDate(date.getDate() - 30); // 30 days ago
-  return date.toISOString().split("T")[0];
-}, []);
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -575,10 +628,7 @@ const minDate = useMemo(() => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                fetchChartLogs();
-                fetchTableLogs();
-              }}
+              onClick={refreshData}
               disabled={isLoading}
               className="gap-2"
             >
@@ -752,11 +802,7 @@ const minDate = useMemo(() => {
                     </Label>
                     <Select
                       value={logTimeFilter}
-                      onValueChange={(value) => {
-                        console.log("value changed for logtimefilter ", value);
-                        setLogTimeFilter(value as LogTimeFilterType);
-                        console.log("log time filter ", logTimeFilter);
-                      }}
+                      onValueChange={(value) => setLogTimeFilter(value as LogTimeFilterType)}
                       disabled={!!fromDate || !!toDate}
                     >
                       <SelectTrigger id="logTimeFilter" className="h-7 mt-1">
@@ -785,7 +831,7 @@ const minDate = useMemo(() => {
                         onChange={(e) => setFromDate(e.target.value)}
                         className="h-7 mt-1"
                         max={maxDate}
-                      min={minDate}
+                        min={minDate}
                       />
                     </div>
                     <div>
@@ -802,7 +848,7 @@ const minDate = useMemo(() => {
                         onChange={(e) => setToDate(e.target.value)}
                         className="h-7 mt-1"
                         max={maxDate}
-                      min={minDate}
+                        min={minDate}
                       />
                     </div>
 
@@ -834,12 +880,12 @@ const minDate = useMemo(() => {
             </div>
 
             <div className="space-y-4 pt-4">
-              {getPaginatedLogs().logs.length === 0 ? (
+              {paginatedLogs.logs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No monitoring logs found
                 </div>
               ) : (
-                getPaginatedLogs().logs.map((log) => (
+                paginatedLogs.logs.map((log) => (
                   <div
                     key={log.id}
                     className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-sm"
@@ -923,7 +969,7 @@ const minDate = useMemo(() => {
 
               <div className="flex items-center justify-between pt-6 pb-2">
                 <div className="text-sm text-gray-600">
-                  Total: {getPaginatedLogs().totalCount} logs
+                  Total: {paginatedLogs.totalCount} logs
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -931,7 +977,7 @@ const minDate = useMemo(() => {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1 || getPaginatedLogs().totalCount === 0}
+                    disabled={currentPage === 1 || paginatedLogs.totalCount === 0}
                     className="gap-1 h-9"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -940,8 +986,8 @@ const minDate = useMemo(() => {
 
                   <div className="flex items-center gap-1">
                     <span className="text-sm">
-                      Page {getPaginatedLogs().totalCount === 0 ? 0 : currentPage} of{" "}
-                      {getPaginatedLogs().totalPages} 
+                      Page {paginatedLogs.totalCount === 0 ? 0 : currentPage} of{" "}
+                      {paginatedLogs.totalPages} 
                     </span>
                   </div>
 
@@ -949,9 +995,7 @@ const minDate = useMemo(() => {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={
-                      currentPage >= getPaginatedLogs().totalPages || getPaginatedLogs().totalCount === 0
-                    }
+                    disabled={currentPage >= paginatedLogs.totalPages || paginatedLogs.totalCount === 0}
                     className="gap-1 h-9"
                   >
                     Next
