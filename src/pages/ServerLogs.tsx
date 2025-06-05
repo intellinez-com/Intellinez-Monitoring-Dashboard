@@ -19,7 +19,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { Badge } from "@/components/ui/badge";
 
 import { cn } from "@/lib/utils";
 import {
@@ -44,8 +43,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { Chart } from "react-chartjs-2";
 
 ChartJS.register(
@@ -180,137 +179,162 @@ export default function ServerLogs() {
     }
   }, [serverName, chartTimeFilter]);
 
-  const fetchTableLogs = useCallback(async (page: number) => {
-    setIsLoading(true);
-    try {
-      const now = new Date();
-      let hoursAgo = 1;
-      switch (logTimeFilter) {
-        case "6h":
-          hoursAgo = 6;
-          break;
-        case "12h":
-          hoursAgo = 12;
-          break;
-        case "24h":
-          hoursAgo = 24;
-          break;
-        default:
-          hoursAgo = 1;
-      }
-      
-      let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
-      let endTime = now;
-
-      if (fromDate) {
-        startTime = new Date(fromDate);
-        startTime.setHours(0, 0, 0, 0);
-      }
-      if (toDate) {
-        endTime = new Date(toDate + "T23:59:59.999Z");
-      }
-
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage - 1;
-
-      let countQuery = supabase
-        .from("server_metrics")
-        .select("*", { count: "exact", head: true })
-        .eq("server_name", serverName)
-        .gte("checked_at", startTime.toISOString())
-        .lte("checked_at", endTime.toISOString());
-
-      let dataQuery = supabase
-        .from("server_metrics")
-        .select("*")
-        .eq("server_name", serverName)
-        .gte("checked_at", startTime.toISOString())
-        .lte("checked_at", endTime.toISOString());
-
-      if (selectedHealthStatus !== "all") {
-        countQuery = countQuery.eq("health_status", selectedHealthStatus);
-        dataQuery = dataQuery.eq("health_status", selectedHealthStatus);
-      }
-
-      if (showErrorsOnly) {
-        const errorFilter = `health_status.not.eq.Healthy`;
-        countQuery = countQuery.or(errorFilter);
-        dataQuery = dataQuery.or(errorFilter);
-      }
-
-      dataQuery = dataQuery
-        .order("checked_at", { ascending: false })
-        .range(startIndex, endIndex);
-
-      const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
-        countQuery,
-        dataQuery
-      ]);
-
-      if (countError) throw countError;
-      if (dataError) throw dataError;
-
-      setLogs(data || []);
-      
-      let displayCount = count || 0;
-      
-      if (!fromDate && !toDate && selectedHealthStatus === "all" && !showErrorsOnly) {
-        const expectedCounts = {
-          "1h": 60,
-          "6h": 360, 
-          "12h": 720,
-          "24h": 1440
-        };
-        
-        const expected = expectedCounts[logTimeFilter];
-        const actual = count || 0;
-        
-        if (expected && Math.abs(actual - expected) <= 5) {
-          displayCount = expected;
+  const fetchTableLogs = useCallback(
+    async (page: number) => {
+      setIsLoading(true);
+      try {
+        const now = new Date();
+        let hoursAgo = 1;
+        switch (logTimeFilter) {
+          case "6h":
+            hoursAgo = 6;
+            break;
+          case "12h":
+            hoursAgo = 12;
+            break;
+          case "24h":
+            hoursAgo = 24;
+            break;
+          default:
+            hoursAgo = 1;
         }
-      }
-      
-      setTotalLogsCount(displayCount);
 
-      if (data && page === 1) {
-        const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
-        
-        const { data: distinctStatusData, error: distinctStatusError } = await supabase
+        let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+        let endTime = now;
+
+        if (fromDate) {
+          startTime = new Date(fromDate);
+          startTime.setHours(0, 0, 0, 0);
+        }
+        if (toDate) {
+          endTime = new Date(toDate + "T23:59:59.999Z");
+        }
+
+        const startIndex = (page - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage - 1;
+
+        let countQuery = supabase
           .from("server_metrics")
-          .select("health_status", { count: 'exact', head: false })
+          .select("*", { count: "exact", head: true })
           .eq("server_name", serverName)
           .gte("checked_at", startTime.toISOString())
-          .lte("checked_at", endTime.toISOString())
-          .then(response => {
-            if (response.error) throw response.error;
-            const statuses = Array.from(new Set(response.data.map((log: any) => log.health_status))).sort();
-            return { data: statuses.map(s => ({health_status: s})), error: null };
+          .lte("checked_at", endTime.toISOString());
+
+        let dataQuery = supabase
+          .from("server_metrics")
+          .select("*")
+          .eq("server_name", serverName)
+          .gte("checked_at", startTime.toISOString())
+          .lte("checked_at", endTime.toISOString());
+
+        if (selectedHealthStatus !== "all") {
+          countQuery = countQuery.eq("health_status", selectedHealthStatus);
+          dataQuery = dataQuery.eq("health_status", selectedHealthStatus);
+        }
+
+        if (showErrorsOnly) {
+          const errorFilter = `health_status.not.eq.Healthy`;
+          countQuery = countQuery.or(errorFilter);
+          dataQuery = dataQuery.or(errorFilter);
+        }
+
+        dataQuery = dataQuery
+          .order("checked_at", { ascending: false })
+          .range(startIndex, endIndex);
+
+        const [{ count, error: countError }, { data, error: dataError }] =
+          await Promise.all([countQuery, dataQuery]);
+
+        if (countError) throw countError;
+        if (dataError) throw dataError;
+
+        setLogs(data || []);
+
+        let displayCount = count || 0;
+
+        if (
+          !fromDate &&
+          !toDate &&
+          selectedHealthStatus === "all" &&
+          !showErrorsOnly
+        ) {
+          const expectedCounts = {
+            "1h": 60,
+            "6h": 360,
+            "12h": 720,
+            "24h": 1440,
+          };
+
+          const expected = expectedCounts[logTimeFilter];
+          const actual = count || 0;
+
+          if (expected && Math.abs(actual - expected) <= 5) {
+            displayCount = expected;
+          }
+        }
+
+        setTotalLogsCount(displayCount);
+
+        if (data && page === 1) {
+          const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
+
+          const { data: distinctStatusData, error: distinctStatusError } =
+            await supabase
+              .from("server_metrics")
+              .select("health_status", { count: "exact", head: false })
+              .eq("server_name", serverName)
+              .gte("checked_at", startTime.toISOString())
+              .lte("checked_at", endTime.toISOString())
+              .then((response) => {
+                if (response.error) throw response.error;
+                const statuses = Array.from(
+                  new Set(response.data.map((log: any) => log.health_status))
+                ).sort();
+                return {
+                  data: statuses.map((s) => ({ health_status: s })),
+                  error: null,
+                };
+              });
+
+          if (distinctStatusError) {
+            console.error(
+              "Error fetching distinct health statuses:",
+              distinctStatusError
+            );
+          }
+
+          const statusesFromLogs = distinctStatusData
+            ? distinctStatusData.map((log: any) => log.health_status)
+            : [];
+
+          const combinedStatuses = Array.from(
+            new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
+          ).sort((a, b) => {
+            if (a === "all") return -1;
+            if (b === "all") return 1;
+            return a.localeCompare(b);
           });
 
-        if (distinctStatusError) {
-          console.error("Error fetching distinct health statuses:", distinctStatusError);
+          setUniqueHealthStatuses(combinedStatuses);
         }
-        
-        const statusesFromLogs = distinctStatusData ? distinctStatusData.map((log: any) => log.health_status) : [];
-
-        const combinedStatuses = Array.from(
-          new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
-        ).sort((a, b) => {
-          if (a === "all") return -1;
-          if (b === "all") return 1;
-          return a.localeCompare(b);
-        });
-        
-        setUniqueHealthStatuses(combinedStatuses);
+      } catch (error) {
+        console.error("Error fetching logs data:", error);
+        setLogs([]);
+        setTotalLogsCount(0);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching logs data:", error);
-      setLogs([]);
-      setTotalLogsCount(0);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [serverName, logTimeFilter, fromDate, toDate, itemsPerPage, selectedHealthStatus, showErrorsOnly]);
+    },
+    [
+      serverName,
+      logTimeFilter,
+      fromDate,
+      toDate,
+      itemsPerPage,
+      selectedHealthStatus,
+      showErrorsOnly,
+    ]
+  );
 
   useEffect(() => {
     fetchChartLogs();
@@ -395,29 +419,6 @@ export default function ServerLogs() {
     link.click();
     document.body.removeChild(link);
   };
-
-  const getHealthStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "healthy":
-        return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-      case "degraded":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      case "offline":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Activity className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
-  const maxDate = useMemo(() => {
-    return new Date().toISOString().split("T")[0];
-  }, []);
-
-  const minDate = useMemo(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return date.toISOString().split("T")[0];
-  }, []);
 
   const prepareTimelineChartData = useCallback(
     (
@@ -594,6 +595,36 @@ export default function ServerLogs() {
 
   const noDataForChart = getTimelineChartFilteredLogs().length === 0;
 
+  const getHealthStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "healthy":
+        return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+      case "degraded":
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case "offline":
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <Activity className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const maxDate = useMemo(() => {
+    return new Date().toISOString().split("T")[0];
+  }, []);
+
+  const minDate = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return date.toISOString().split("T")[0];
+  }, []);
+
+  function formatDateLocal(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -766,11 +797,11 @@ export default function ServerLogs() {
 
             <div className="px-1 py-4 border-t border-b ">
               <div className="flex items-center justify-between gap-4 items-center">
-                <div className="flex items-center justify-between gap-5">
-                  <div className="sm:col-span-1">
+                <div className="flex flex-wrap items-end gap-4 sm:col-span-1">
+                  <div className="flex flex-col min-w-[170px]">
                     <Label
                       htmlFor="healthStatusFilter"
-                      className="text-xs font-medium text-muted-foreground"
+                      className="text-xs font-medium text-muted-foreground mb-1"
                     >
                       Filter by Health Status
                     </Label>
@@ -780,7 +811,7 @@ export default function ServerLogs() {
                     >
                       <SelectTrigger
                         id="healthStatusFilter"
-                        className="h-7 mt-1"
+                        className="h-9 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <SelectValue placeholder="Select health status" />
                       </SelectTrigger>
@@ -793,19 +824,24 @@ export default function ServerLogs() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="sm:col-span-1">
+                  <div className="flex flex-col min-w-[140px]">
                     <Label
                       htmlFor="logTimeFilter"
-                      className="text-xs font-medium text-muted-foreground"
+                      className="text-xs font-medium text-muted-foreground mb-1"
                     >
                       Filter Logs by Time
                     </Label>
                     <Select
                       value={logTimeFilter}
-                      onValueChange={(value) => setLogTimeFilter(value as LogTimeFilterType)}
+                      onValueChange={(value) =>
+                        setLogTimeFilter(value as LogTimeFilterType)
+                      }
                       disabled={!!fromDate || !!toDate}
                     >
-                      <SelectTrigger id="logTimeFilter" className="h-7 mt-1">
+                      <SelectTrigger
+                        id="logTimeFilter"
+                        className="h-9 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
                         <SelectValue placeholder="Select time range" />
                       </SelectTrigger>
                       <SelectContent>
@@ -816,51 +852,151 @@ export default function ServerLogs() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-end gap-2 sm:col-span-1">
-                    <div>
-                      <Label
-                        htmlFor="fromDate"
-                        className="text-xs font-medium text-muted-foreground"
-                      >
-                        From
-                      </Label>
-                      <Input
-                        id="fromDate"
-                        type="date"
-                        value={fromDate}
-                        onChange={(e) => setFromDate(e.target.value)}
-                        className="h-7 mt-1"
-                        max={maxDate}
-                        min={minDate}
-                      />
-                    </div>
-                    <div>
-                      <Label
-                        htmlFor="toDate"
-                        className="text-xs font-medium text-muted-foreground"
-                      >
-                        To
-                      </Label>
-                      <Input
-                        id="toDate"
-                        type="date"
-                        value={toDate}
-                        onChange={(e) => setToDate(e.target.value)}
-                        className="h-7 mt-1"
-                        max={maxDate}
-                        min={minDate}
-                      />
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-22 p-2 ml-1 bg-gray-200 text-xs "
-                      onClick={resetFilters}
+                  <div className="flex flex-col min-w-[180px]">
+                    <Label
+                      htmlFor="fromDate"
+                      className="text-xs font-medium text-muted-foreground mb-1"
                     >
-                      Reset Filters
-                    </Button>
+                      From
+                    </Label>
+                    <DatePicker
+                      id="fromDate"
+                      selected={fromDate ? new Date(fromDate) : null}
+                      onChange={(date: Date | null) => {
+                        if (date instanceof Date && !isNaN(date.getTime())) {
+                          if (toDate && date > new Date(toDate)) {
+                            setToDate("");
+                          }
+
+                          setFromDate(formatDateLocal(date)); // Use local formatter
+                        } else {
+                          setFromDate("");
+                        }
+                      }}
+                      dateFormat="yyyy-MM-dd"
+                      className="h-9 mt-1 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
+                      maxDate={toDate ? new Date(toDate) : new Date(maxDate)}
+                      minDate={new Date(minDate)}
+                      placeholderText="Start date"
+                      isClearable
+                      showPopperArrow={false}
+                      popperPlacement="bottom-start"
+                    />
                   </div>
+                  <div className="flex flex-col min-w-[180px]">
+                    <Label
+                      htmlFor="toDate"
+                      className="text-xs font-medium text-muted-foreground mb-1"
+                    >
+                      To
+                    </Label>
+                    <DatePicker
+                      id="toDate"
+                      selected={toDate ? new Date(toDate) : null}
+                      onChange={(date: Date | null) => {
+                        if (!fromDate) {
+                          // Show a visual indicator instead of alert
+
+                          const fromInput = document.getElementById("fromDate");
+
+                          if (fromInput) {
+                            // Add red border
+
+                            fromInput.classList.add("ring-2", "ring-red-400");
+
+                            // Create tooltip
+
+                            const tooltip = document.createElement("div");
+
+                            tooltip.textContent = "Please select start date";
+
+                            tooltip.className = `absolute left-0 mt-1 px-2 py-1 text-xs text-white bg-red-500 rounded shadow z-50 animate-fade-in`;
+
+                            // Positioning
+
+                            const inputRect = fromInput.getBoundingClientRect();
+
+                            tooltip.style.top = `${
+                              fromInput.offsetHeight + 4
+                            }px`; // 4px margin
+
+                            tooltip.style.minWidth = "max-content";
+
+                            // Attach tooltip to input's parent
+
+                            const parent = fromInput.parentElement;
+
+                            if (parent) {
+                              parent.style.position = "relative"; // ensure positioning
+
+                              parent.appendChild(tooltip);
+
+                              // Remove both border and tooltip after 1.5s
+
+                              setTimeout(() => {
+                                fromInput.classList.remove(
+                                  "ring-2",
+                                  "ring-red-400"
+                                );
+
+                                tooltip.remove();
+                              }, 1500);
+                            }
+                          }
+
+                          return;
+                        }
+
+                        if (date instanceof Date && !isNaN(date.getTime())) {
+                          if (fromDate && date < new Date(fromDate)) {
+                            const toInput = document.getElementById("toDate");
+
+                            if (toInput) {
+                              toInput.classList.add("ring-2", "ring-red-400");
+
+                              setTimeout(() => {
+                                toInput.classList.remove(
+                                  "ring-2",
+                                  "ring-red-400"
+                                );
+                              }, 1500);
+                            }
+
+                            return;
+                          }
+
+                          setToDate(formatDateLocal(date));
+                        } else {
+                          setToDate("");
+                        }
+                      }}
+                      dateFormat="yyyy-MM-dd"
+                      className="h-9 mt-1 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
+                      minDate={
+                        fromDate
+                          ? new Date(
+                              new Date(fromDate).setDate(
+                                new Date(fromDate).getDate() + 1
+                              )
+                            )
+                          : new Date(minDate)
+                      }
+                      maxDate={maxDate ? new Date(maxDate) : new Date()}
+                      placeholderText="End date"
+                      isClearable
+                      showPopperArrow={false}
+                      popperPlacement="bottom-start"
+                    />
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-4 bg-gray-100 hover:bg-gray-200 text-xs border border-gray-300 rounded-md shadow-sm mt-5"
+                    onClick={resetFilters}
+                  >
+                    Reset Filters
+                  </Button>
                 </div>
 
                 <div className="flex items-center mr-4 space-x-2 justify-end sm:col-span-1">
@@ -977,7 +1113,9 @@ export default function ServerLogs() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1 || paginatedLogs.totalCount === 0}
+                    disabled={
+                      currentPage === 1 || paginatedLogs.totalCount === 0
+                    }
                     className="gap-1 h-9"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -987,7 +1125,7 @@ export default function ServerLogs() {
                   <div className="flex items-center gap-1">
                     <span className="text-sm">
                       Page {paginatedLogs.totalCount === 0 ? 0 : currentPage} of{" "}
-                      {paginatedLogs.totalPages} 
+                      {paginatedLogs.totalPages}
                     </span>
                   </div>
 
@@ -995,7 +1133,10 @@ export default function ServerLogs() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= paginatedLogs.totalPages || paginatedLogs.totalCount === 0}
+                    disabled={
+                      currentPage >= paginatedLogs.totalPages ||
+                      paginatedLogs.totalCount === 0
+                    }
                     className="gap-1 h-9"
                   >
                     Next

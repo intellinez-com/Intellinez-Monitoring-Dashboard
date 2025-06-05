@@ -40,10 +40,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Chart } from "react-chartjs-2";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 ChartJS.register(
   CategoryScale,
@@ -147,140 +148,166 @@ export default function WebsiteLogs() {
   }, [id, chartTimeFilter]);
 
   // Fetch logs data (for table)
-  const fetchLogsData = useCallback(async (page: number) => {
-    setIsLoading(true);
-    try {
-      const now = new Date();
-      let hoursAgo = 1;
-      switch (logTimeFilter) {
-        case "6h":
-          hoursAgo = 6;
-          break;
-        case "12h":
-          hoursAgo = 12;
-          break;
-        case "24h":
-          hoursAgo = 24;
-          break;
-        default:
-          hoursAgo = 1;
-      }
-      let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
-      let endTime = now;
-
-      // If user selected fromDate or toDate, override the time filter
-      if (fromDate) startTime = new Date(fromDate);
-      if (toDate) endTime = new Date(toDate + "T23:59:59");
-
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage - 1;
-
-      // Step 1: Build base query for COUNT (without range)
-      let countQuery = supabase
-        .from("website_monitoring_logs")
-        .select("*", { count: "exact", head: true })
-        .eq("website_id", id)
-        .gte("checked_at", startTime.toISOString())
-        .lte("checked_at", endTime.toISOString());
-
-      // Step 2: Build data query for ACTUAL RECORDS (with range)
-      let dataQuery = supabase
-        .from("website_monitoring_logs")
-        .select("*")
-        .eq("website_id", id)
-        .gte("checked_at", startTime.toISOString())
-        .lte("checked_at", endTime.toISOString());
-
-      // Apply health status filter to BOTH queries
-      if (selectedHealthStatus !== "all") {
-        countQuery = countQuery.eq("health_status", selectedHealthStatus);
-        dataQuery = dataQuery.eq("health_status", selectedHealthStatus);
-      }
-
-      // Apply show errors only filter to BOTH queries
-      if (showErrorsOnly) {
-        const errorFilter = `health_status.not.eq.Healthy,status_code.not.eq.200`;
-        countQuery = countQuery.or(errorFilter);
-        dataQuery = dataQuery.or(errorFilter);
-      }
-
-      // Apply ordering and range ONLY to data query
-      dataQuery = dataQuery
-        .order("checked_at", { ascending: false })
-        .range(startIndex, endIndex);
-
-      // Execute BOTH queries
-      const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
-        countQuery,
-        dataQuery
-      ]);
-
-      if (countError) throw countError;
-      if (dataError) throw dataError;
-
-      setLogs(data || []);
-      
-      // UI Fix: Show expected round numbers for standard time filters
-      let displayCount = count || 0;
-      
-      // Only adjust for standard time filters without custom dates/filters
-      if (!fromDate && !toDate && selectedHealthStatus === "all" && !showErrorsOnly) {
-        const expectedCounts = {
-          "1h": 60,
-          "6h": 360, 
-          "12h": 720,
-          "24h": 1440
-        };
-        
-        const expected = expectedCounts[logTimeFilter];
-        const actual = count || 0;
-        
-        // If actual count is very close to expected (within 5 logs), show expected
-        if (expected && Math.abs(actual - expected) <= 5) {
-          displayCount = expected;
+  const fetchLogsData = useCallback(
+    async (page: number) => {
+      setIsLoading(true);
+      try {
+        const now = new Date();
+        let hoursAgo = 1;
+        switch (logTimeFilter) {
+          case "6h":
+            hoursAgo = 6;
+            break;
+          case "12h":
+            hoursAgo = 12;
+            break;
+          case "24h":
+            hoursAgo = 24;
+            break;
+          default:
+            hoursAgo = 1;
         }
-      }
-      
-      setTotalLogsCount(displayCount);
+        let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+        let endTime = now;
 
-      if (data && page === 1) {
-        const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
-        
-        // Fetch all distinct health statuses for the current filter set, not just from the current page
-        const { data: distinctStatusData, error: distinctStatusError } = await supabase
+        // If user selected fromDate or toDate, override the time filter
+        if (fromDate) startTime = new Date(fromDate);
+        if (toDate) endTime = new Date(toDate + "T23:59:59");
+
+        const startIndex = (page - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage - 1;
+
+        // Step 1: Build base query for COUNT (without range)
+        let countQuery = supabase
           .from("website_monitoring_logs")
-          .select("health_status", { count: 'exact', head: false })
+          .select("*", { count: "exact", head: true })
           .eq("website_id", id)
           .gte("checked_at", startTime.toISOString())
-          .lte("checked_at", endTime.toISOString())
-          .then(response => {
-            if (response.error) throw response.error;
-            // Manually get distinct statuses if Supabase doesn't do it directly here or if it's complex with JS client
-            const statuses = Array.from(new Set(response.data.map((log: any) => log.health_status))).sort();
-            return { data: statuses.map(s => ({health_status: s})), error: null }; // format to match expected structure
+          .lte("checked_at", endTime.toISOString());
+
+        // Step 2: Build data query for ACTUAL RECORDS (with range)
+        let dataQuery = supabase
+          .from("website_monitoring_logs")
+          .select("*")
+          .eq("website_id", id)
+          .gte("checked_at", startTime.toISOString())
+          .lte("checked_at", endTime.toISOString());
+
+        // Apply health status filter to BOTH queries
+        if (selectedHealthStatus !== "all") {
+          countQuery = countQuery.eq("health_status", selectedHealthStatus);
+          dataQuery = dataQuery.eq("health_status", selectedHealthStatus);
+        }
+
+        // Apply show errors only filter to BOTH queries
+        if (showErrorsOnly) {
+          const errorFilter = `health_status.not.eq.Healthy,status_code.not.eq.200`;
+          countQuery = countQuery.or(errorFilter);
+          dataQuery = dataQuery.or(errorFilter);
+        }
+
+        // Apply ordering and range ONLY to data query
+        dataQuery = dataQuery
+          .order("checked_at", { ascending: false })
+          .range(startIndex, endIndex);
+
+        // Execute BOTH queries
+        const [{ count, error: countError }, { data, error: dataError }] =
+          await Promise.all([countQuery, dataQuery]);
+
+        if (countError) throw countError;
+        if (dataError) throw dataError;
+
+        setLogs(data || []);
+
+        // UI Fix: Show expected round numbers for standard time filters
+        let displayCount = count || 0;
+
+        // Only adjust for standard time filters without custom dates/filters
+        if (
+          !fromDate &&
+          !toDate &&
+          selectedHealthStatus === "all" &&
+          !showErrorsOnly
+        ) {
+          const expectedCounts = {
+            "1h": 60,
+            "6h": 360,
+            "12h": 720,
+            "24h": 1440,
+          };
+
+          const expected = expectedCounts[logTimeFilter];
+          const actual = count || 0;
+
+          // If actual count is very close to expected (within 5 logs), show expected
+          if (expected && Math.abs(actual - expected) <= 5) {
+            displayCount = expected;
+          }
+        }
+
+        setTotalLogsCount(displayCount);
+
+        if (data && page === 1) {
+          const predefinedStatuses = ["Offline", "Intermittent", "Degraded"];
+
+          // Fetch all distinct health statuses for the current filter set, not just from the current page
+          const { data: distinctStatusData, error: distinctStatusError } =
+            await supabase
+              .from("website_monitoring_logs")
+              .select("health_status", { count: "exact", head: false })
+              .eq("website_id", id)
+              .gte("checked_at", startTime.toISOString())
+              .lte("checked_at", endTime.toISOString())
+              .then((response) => {
+                if (response.error) throw response.error;
+                // Manually get distinct statuses if Supabase doesn't do it directly here or if it's complex with JS client
+                const statuses = Array.from(
+                  new Set(response.data.map((log: any) => log.health_status))
+                ).sort();
+                return {
+                  data: statuses.map((s) => ({ health_status: s })),
+                  error: null,
+                }; // format to match expected structure
+              });
+
+          if (distinctStatusError)
+            console.error(
+              "Error fetching distinct health statuses:",
+              distinctStatusError
+            );
+
+          const statusesFromLogs = distinctStatusData
+            ? distinctStatusData.map((log: any) => log.health_status)
+            : [];
+
+          const combinedStatuses = Array.from(
+            new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
+          ).sort((a, b) => {
+            if (a === "all") return -1;
+            if (b === "all") return 1;
+            return a.localeCompare(b);
           });
-
-        if (distinctStatusError) console.error("Error fetching distinct health statuses:", distinctStatusError);
-        
-        const statusesFromLogs = distinctStatusData ? distinctStatusData.map((log: any) => log.health_status) : [];
-
-        const combinedStatuses = Array.from(
-          new Set(["all", ...predefinedStatuses, ...statusesFromLogs])
-        ).sort((a, b) => {
-          if (a === "all") return -1;
-          if (b === "all") return 1;
-          return a.localeCompare(b);
-        });
-        setUniqueHealthStatuses(combinedStatuses);
+          setUniqueHealthStatuses(combinedStatuses);
+        }
+      } catch (error) {
+        console.error("Error fetching logs data:", error);
+        setLogs([]);
+        setTotalLogsCount(0);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching logs data:", error);
-      setLogs([]);
-      setTotalLogsCount(0);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id, logTimeFilter, fromDate, toDate, itemsPerPage, selectedHealthStatus, showErrorsOnly]);
+    },
+    [
+      id,
+      logTimeFilter,
+      fromDate,
+      toDate,
+      itemsPerPage,
+      selectedHealthStatus,
+      showErrorsOnly,
+    ]
+  );
 
   // Fetch chart data when chartTimeFilter or id changes
   useEffect(() => {
@@ -489,10 +516,17 @@ export default function WebsiteLogs() {
       const now = new Date();
       let hoursAgo = 1;
       switch (logTimeFilter) {
-        case "6h": hoursAgo = 6; break;
-        case "12h": hoursAgo = 12; break;
-        case "24h": hoursAgo = 24; break;
-        default: hoursAgo = 1;
+        case "6h":
+          hoursAgo = 6;
+          break;
+        case "12h":
+          hoursAgo = 12;
+          break;
+        case "24h":
+          hoursAgo = 24;
+          break;
+        default:
+          hoursAgo = 1;
       }
       let startTime = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
       let endTime = now;
@@ -502,7 +536,9 @@ export default function WebsiteLogs() {
 
       let query = supabase
         .from("website_monitoring_logs")
-        .select("checked_at, health_status, status_code, response_time_ms, error_message, created_at")
+        .select(
+          "checked_at, health_status, status_code, response_time_ms, error_message, created_at"
+        )
         .eq("website_id", id)
         .gte("checked_at", startTime.toISOString())
         .lte("checked_at", endTime.toISOString());
@@ -511,9 +547,11 @@ export default function WebsiteLogs() {
         query = query.eq("health_status", selectedHealthStatus);
       }
       if (showErrorsOnly) {
-        query = query.or(`health_status.neq.Healthy,status_code.not.is.null,status_code.neq.200`);
+        query = query.or(
+          `health_status.neq.Healthy,status_code.not.is.null,status_code.neq.200`
+        );
       }
-      
+
       query = query.order("checked_at", { ascending: false });
 
       const { data: allLogs, error } = await query;
@@ -554,7 +592,9 @@ export default function WebsiteLogs() {
         ...csvData.map((row) =>
           row
             .map((cell) =>
-              typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell
+              typeof cell === "string" && cell.includes(",")
+                ? `"${cell}"`
+                : cell
             )
             .join(",")
         ),
@@ -607,17 +647,25 @@ export default function WebsiteLogs() {
     setLogTimeFilter("1h");
     setSelectedHealthStatus("all");
     setShowErrorsOnly(false);
+    setShowErrorsOnly(false);
   };
-  
+
   const maxDate = useMemo(() => {
     return new Date().toISOString().split("T")[0]; // Today
   }, []);
-  
+
   const minDate = useMemo(() => {
     const date = new Date();
     date.setDate(date.getDate() - 30); // 30 days ago
     return date.toISOString().split("T")[0];
   }, []);
+
+  function formatDateLocal(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
 
   return (
     <DashboardLayout>
@@ -748,115 +796,221 @@ export default function WebsiteLogs() {
 
             <div className="px-1 py-4 border-t border-b">
               <div className="flex items-center justify-between gap-4 items-center">
-                <div className="flex items-center justify-between gap-5">
-                  <div className="sm:col-span-1">
-                  <Label
-                    htmlFor="healthStatusFilter"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Filter by Health Status
-                  </Label>
-                  <Select
-                    value={selectedHealthStatus}
-                    onValueChange={setSelectedHealthStatus}
-                  >
-                    <SelectTrigger id="healthStatusFilter" className="h-7 mt-1">
-                      <SelectValue placeholder="Select health status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {uniqueHealthStatuses.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status === "all" ? "All Health Statuses" : status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="sm:col-span-1">
-                  <Label
-                    htmlFor="logTimeFilter"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Filter Logs by Time
-                  </Label>
-                  <Select
-                    value={logTimeFilter}
-                    onValueChange={(value) =>
-                      setLogTimeFilter(value as LogTimeFilterType)
-                    }
-                    disabled={!!fromDate || !!toDate}
-                  >
-                    <SelectTrigger id="logTimeFilter" className="h-7 w-36 mt-1">
-                      <SelectValue placeholder="Select time range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1h">Last Hour</SelectItem>
-                      <SelectItem value="6h">Last 6 Hours</SelectItem>
-                      <SelectItem value="12h">Last 12 hours</SelectItem>
-                      <SelectItem value="24h">Last 24 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end gap-2 sm:col-span-1">
-                  <div>
+                <div className="flex items-end gap-4 flex-wrap sm:col-span-1">
+                  <div className="flex flex-col min-w-[180px]">
+                    <Label
+                      htmlFor="healthStatusFilter"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Filter by Health Status
+                    </Label>
+                    <Select
+                      value={selectedHealthStatus}
+                      onValueChange={setSelectedHealthStatus}
+                    >
+                      <SelectTrigger
+                        id="healthStatusFilter"
+                        className="h-9 mt-1 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <SelectValue placeholder="Select health status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {uniqueHealthStatuses.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status === "all" ? "All Health Statuses" : status}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col min-w-[160px]">
+                    <Label
+                      htmlFor="logTimeFilter"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Filter Logs by Time
+                    </Label>
+                    <Select
+                      value={logTimeFilter}
+                      onValueChange={(value) =>
+                        setLogTimeFilter(value as LogTimeFilterType)
+                      }
+                      disabled={!!fromDate || !!toDate}
+                    >
+                      <SelectTrigger
+                        id="logTimeFilter"
+                        className="h-9 mt-1 w-36 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <SelectValue placeholder="Select time range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1h">Last Hour</SelectItem>
+                        <SelectItem value="6h">Last 6 Hours</SelectItem>
+                        <SelectItem value="12h">Last 12 hours</SelectItem>
+                        <SelectItem value="24h">Last 24 hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col min-w-[180px]">
                     <Label
                       htmlFor="fromDate"
-                      className="text-xs font-medium text-muted-foreground"
+                      className="text-xs font-medium text-muted-foreground mb-1"
                     >
                       From
                     </Label>
-                    <Input
+                    <DatePicker
                       id="fromDate"
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="h-7 mt-1 text-xs"
-                      max={maxDate}
-                      min={minDate}
+                      selected={fromDate ? new Date(fromDate) : null}
+                      onChange={(date: Date | null) => {
+                        if (date instanceof Date && !isNaN(date.getTime())) {
+                          if (toDate && date > new Date(toDate)) {
+                            setToDate("");
+                          }
+
+                          setFromDate(formatDateLocal(date)); // Use local formatter
+                        } else {
+                          setFromDate("");
+                        }
+                      }}
+                      dateFormat="yyyy-MM-dd"
+                      className="h-9 mt-1 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
+                      maxDate={toDate ? new Date(toDate) : new Date(maxDate)}
+                      minDate={new Date(minDate)}
+                      placeholderText="Start date"
+                      isClearable
+                      showPopperArrow={false}
+                      popperPlacement="bottom-start"
                     />
                   </div>
-                  <div>
+                  <div className="flex flex-col min-w-[180px]">
                     <Label
                       htmlFor="toDate"
-                      className="text-xs font-medium text-muted-foreground"
+                      className="text-xs font-medium text-muted-foreground mb-1"
                     >
                       To
                     </Label>
-                    <Input
+                    <DatePicker
                       id="toDate"
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className="h-7 mt-1"
-                      min={minDate}
-                      max={maxDate}
+                      selected={toDate ? new Date(toDate) : null}
+                      onChange={(date: Date | null) => {
+                        if (!fromDate) {
+                          // Show a visual indicator instead of alert
+
+                          const fromInput = document.getElementById("fromDate");
+
+                          if (fromInput) {
+                            // Add red border
+
+                            fromInput.classList.add("ring-2", "ring-red-400");
+
+                            // Create tooltip
+
+                            const tooltip = document.createElement("div");
+
+                            tooltip.textContent = "Please select start date";
+
+                            tooltip.className = `absolute left-0 mt-1 px-2 py-1 text-xs text-white bg-red-500 rounded shadow z-50 animate-fade-in`;
+
+                            // Positioning
+
+                            const inputRect = fromInput.getBoundingClientRect();
+
+                            tooltip.style.top = `${
+                              fromInput.offsetHeight + 4
+                            }px`; // 4px margin
+
+                            tooltip.style.minWidth = "max-content";
+
+                            // Attach tooltip to input's parent
+
+                            const parent = fromInput.parentElement;
+
+                            if (parent) {
+                              parent.style.position = "relative"; // ensure positioning
+
+                              parent.appendChild(tooltip);
+
+                              // Remove both border and tooltip after 1.5s
+
+                              setTimeout(() => {
+                                fromInput.classList.remove(
+                                  "ring-2",
+                                  "ring-red-400"
+                                );
+
+                                tooltip.remove();
+                              }, 1500);
+                            }
+                          }
+
+                          return;
+                        }
+
+                        if (date instanceof Date && !isNaN(date.getTime())) {
+                          if (fromDate && date < new Date(fromDate)) {
+                            const toInput = document.getElementById("toDate");
+
+                            if (toInput) {
+                              toInput.classList.add("ring-2", "ring-red-400");
+
+                              setTimeout(() => {
+                                toInput.classList.remove(
+                                  "ring-2",
+                                  "ring-red-400"
+                                );
+                              }, 1500);
+                            }
+
+                            return;
+                          }
+
+                          setToDate(formatDateLocal(date));
+                        } else {
+                          setToDate("");
+                        }
+                      }}
+                      dateFormat="yyyy-MM-dd"
+                      className="h-9 mt-1 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
+                      minDate={
+                        fromDate
+                          ? new Date(
+                              new Date(fromDate).setDate(
+                                new Date(fromDate).getDate() + 1
+                              )
+                            )
+                          : new Date(minDate)
+                      }
+                      maxDate={maxDate ? new Date(maxDate) : new Date()}
+                      placeholderText="End date"
+                      isClearable
+                      showPopperArrow={false}
+                      popperPlacement="bottom-start"
                     />
                   </div>
+
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-22 p-2 ml-1 bg-gray-200 text-xs"
+                    className="h-9 px-4 ml-2 mt-5 bg-gray-100 hover:bg-gray-200 text-xs border border-gray-300 rounded-md shadow-sm"
                     onClick={resetFilters}
                   >
                     Reset Filters
                   </Button>
                 </div>
+                <div className="flex items-center mr-4 space-x-2 justify-end sm:col-span-1">
+                  <Switch
+                    id="showErrorsOnly"
+                    checked={showErrorsOnly}
+                    onCheckedChange={setShowErrorsOnly}
+                  />
+                  <Label
+                    htmlFor="showErrorsOnly"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Show Errors Only
+                  </Label>
                 </div>
-                <div className="flex items-center mr-4 gap-2 justify-end">
-                <Switch
-                  id="showErrorsOnly"
-                  checked={showErrorsOnly}
-                  onCheckedChange={setShowErrorsOnly}
-                />
-                <Label
-                  htmlFor="showErrorsOnly"
-                  className="text-xs text-muted-foreground"
-                >
-                  Show Errors Only
-                </Label>
               </div>
-              </div>
-              
             </div>
 
             <div className="space-y-4 pt-4">
@@ -955,7 +1109,9 @@ export default function WebsiteLogs() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1 || paginatedLogs.totalCount === 0}
+                    disabled={
+                      currentPage === 1 || paginatedLogs.totalCount === 0
+                    }
                     className="gap-1 h-9"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -963,14 +1119,18 @@ export default function WebsiteLogs() {
                   </Button>
                   <div className="flex items-center gap-1">
                     <span className="text-sm">
-                      Page {paginatedLogs.totalCount === 0 ? 0 : currentPage} of {paginatedLogs.totalPages}
+                      Page {paginatedLogs.totalCount === 0 ? 0 : currentPage} of{" "}
+                      {paginatedLogs.totalPages}
                     </span>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= paginatedLogs.totalPages || paginatedLogs.totalCount === 0}
+                    disabled={
+                      currentPage >= paginatedLogs.totalPages ||
+                      paginatedLogs.totalCount === 0
+                    }
                     className="gap-1 h-9"
                   >
                     Next
