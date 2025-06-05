@@ -40,10 +40,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Chart } from "react-chartjs-2";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 ChartJS.register(
   CategoryScale,
@@ -500,12 +501,13 @@ export default function WebsiteLogs() {
     setToDate("");
     setLogTimeFilter("1h");
     setSelectedHealthStatus("all");
+    setShowErrorsOnly(false);
   };
-  
-    const maxDate = useMemo(() => {
+
+  const maxDate = useMemo(() => {
     return new Date().toISOString().split("T")[0]; // Today
   }, []);
-  
+
   const minDate = useMemo(() => {
     const date = new Date();
     date.setDate(date.getDate() - 30); // 30 days ago
@@ -641,115 +643,186 @@ export default function WebsiteLogs() {
 
             <div className="px-1 py-4 border-t border-b">
               <div className="flex items-center justify-between gap-4 items-center">
-                <div className="flex items-center justify-between gap-5">
-                  <div className="sm:col-span-1">
-                  <Label
-                    htmlFor="healthStatusFilter"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Filter by Health Status
-                  </Label>
-                  <Select
-                    value={selectedHealthStatus}
-                    onValueChange={setSelectedHealthStatus}
-                  >
-                    <SelectTrigger id="healthStatusFilter" className="h-7 mt-1">
-                      <SelectValue placeholder="Select health status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {uniqueHealthStatuses.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status === "all" ? "All Health Statuses" : status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="sm:col-span-1">
-                  <Label
-                    htmlFor="logTimeFilter"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Filter Logs by Time
-                  </Label>
-                  <Select
-                    value={logTimeFilter}
-                    onValueChange={(value) =>
-                      setLogTimeFilter(value as LogTimeFilterType)
-                    }
-                    disabled={!!fromDate || !!toDate}
-                  >
-                    <SelectTrigger id="logTimeFilter" className="h-7 w-36 mt-1">
-                      <SelectValue placeholder="Select time range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1h">Last Hour</SelectItem>
-                      <SelectItem value="6h">Last 6 Hours</SelectItem>
-                      <SelectItem value="12h">Last 12 hours</SelectItem>
-                      <SelectItem value="24h">Last 24 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end gap-2 sm:col-span-1">
-                  <div>
+                <div className="flex items-end gap-4 flex-wrap sm:col-span-1">
+                  <div className="flex flex-col min-w-[180px]">
+                    <Label
+                      htmlFor="healthStatusFilter"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Filter by Health Status
+                    </Label>
+                    <Select
+                      value={selectedHealthStatus}
+                      onValueChange={setSelectedHealthStatus}
+                    >
+                      <SelectTrigger
+                        id="healthStatusFilter"
+                        className="h-9 mt-1 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <SelectValue placeholder="Select health status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {uniqueHealthStatuses.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status === "all" ? "All Health Statuses" : status}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col min-w-[160px]">
+                    <Label
+                      htmlFor="logTimeFilter"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Filter Logs by Time
+                    </Label>
+                    <Select
+                      value={logTimeFilter}
+                      onValueChange={(value) => setLogTimeFilter(value as LogTimeFilterType)}
+                      disabled={!!fromDate || !!toDate}
+                    >
+                      <SelectTrigger
+                        id="logTimeFilter"
+                        className="h-9 mt-1 w-36 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <SelectValue placeholder="Select time range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1h">Last Hour</SelectItem>
+                        <SelectItem value="6h">Last 6 Hours</SelectItem>
+                        <SelectItem value="12h">Last 12 hours</SelectItem>
+                        <SelectItem value="24h">Last 24 hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col min-w-[180px]">
                     <Label
                       htmlFor="fromDate"
-                      className="text-xs font-medium text-muted-foreground"
+                      className="text-xs font-medium text-muted-foreground mb-1"
                     >
                       From
                     </Label>
-                    <Input
+                    <DatePicker
                       id="fromDate"
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="h-7 mt-1 text-xs"
-                      max={maxDate}
-                      min={minDate}
+                      selected={fromDate ? new Date(fromDate) : null}
+                      onChange={(date: Date | null) => {
+                        if (date instanceof Date && !isNaN(date.getTime())) {
+                          // If toDate is set and new fromDate is after toDate, reset toDate
+                          if (toDate && date > new Date(toDate)) {
+                            setToDate("");
+                          }
+                          setFromDate(date.toISOString().split("T")[0]);
+                        } else {
+                          setFromDate("");
+                        }
+                      }}
+                      dateFormat="yyyy-MM-dd"
+                      className="h-9 mt-1 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
+                      maxDate={toDate ? new Date(toDate) : new Date(maxDate)}
+                      minDate={new Date(minDate)}
+                      placeholderText="Start date"
+                      isClearable
+                      showPopperArrow={false}
+                      popperPlacement="bottom-start"
                     />
                   </div>
-                  <div>
+                  <div className="flex flex-col min-w-[180px]">
                     <Label
                       htmlFor="toDate"
-                      className="text-xs font-medium text-muted-foreground"
+                      className="text-xs font-medium text-muted-foreground mb-1"
                     >
                       To
                     </Label>
-                    <Input
+                    <DatePicker
                       id="toDate"
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className="h-7 mt-1"
-                      min={minDate}
-                      max={maxDate}
+                      selected={toDate ? new Date(toDate) : null}
+                      onChange={(date: Date | null) => {
+                        if (!fromDate) {
+                          // Show a visual indicator instead of alert
+                          const fromInput = document.getElementById("fromDate");
+
+                          if (fromInput) {
+                            // Add red border
+                            fromInput.classList.add("ring-2", "ring-red-400");
+
+                            // Create tooltip
+                            const tooltip = document.createElement("div");
+                            tooltip.textContent = "Please select start date";
+                            tooltip.className = `absolute left-0 mt-1 px-2 py-1 text-xs text-white bg-red-500 rounded shadow z-50 animate-fade-in`;
+
+                            // Positioning
+                            const inputRect = fromInput.getBoundingClientRect();
+                            tooltip.style.top = `${fromInput.offsetHeight + 4}px`; // 4px margin
+                            tooltip.style.minWidth = "max-content";
+
+                            // Attach tooltip to input's parent
+                            const parent = fromInput.parentElement;
+                            if (parent) {
+                              parent.style.position = "relative"; // ensure positioning
+                              parent.appendChild(tooltip);
+
+                              // Remove both border and tooltip after 1.5s
+                              setTimeout(() => {
+                                fromInput.classList.remove("ring-2", "ring-red-400");
+                                tooltip.remove();
+                              }, 1500);
+                            }
+                          }
+                          return;
+                        }
+                        if (date instanceof Date && !isNaN(date.getTime())) {
+                          // Prevent selecting toDate before fromDate
+                          if (fromDate && date < new Date(fromDate)) {
+                            const toInput = document.getElementById("toDate");
+                            if (toInput) {
+                              toInput.classList.add("ring-2", "ring-red-400");
+                              setTimeout(() => {
+                                toInput.classList.remove("ring-2", "ring-red-400");
+                              }, 1500);
+                            }
+                            return;
+                          }
+                          setToDate(date.toISOString().split("T")[0]);
+                        } else {
+                          setToDate("");
+                        }
+                      }}
+                      dateFormat="yyyy-MM-dd"
+                      className="h-9 mt-1 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-sm bg-white"
+                      minDate={fromDate ? new Date(fromDate) : new Date(minDate)}
+                      maxDate={maxDate ? new Date(maxDate) : new Date()}
+                      placeholderText="End date"
+                      isClearable
+                      showPopperArrow={false}
+                      popperPlacement="bottom-start"
                     />
+
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-22 p-2 ml-1 bg-gray-200 text-xs"
+                    className="h-9 px-4 ml-2 mt-5 bg-gray-100 hover:bg-gray-200 text-xs border border-gray-300 rounded-md shadow-sm"
                     onClick={resetFilters}
                   >
                     Reset Filters
                   </Button>
                 </div>
+                <div className="flex items-center mr-4 space-x-2 justify-end sm:col-span-1">
+                  <Switch
+                    id="showErrorsOnly"
+                    checked={showErrorsOnly}
+                    onCheckedChange={setShowErrorsOnly}
+                  />
+                  <Label
+                    htmlFor="showErrorsOnly"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Show Errors Only
+                  </Label>
                 </div>
-                <div className="flex items-center mr-4 gap-2 justify-end">
-                <Switch
-                  id="showErrorsOnly"
-                  checked={showErrorsOnly}
-                  onCheckedChange={setShowErrorsOnly}
-                />
-                <Label
-                  htmlFor="showErrorsOnly"
-                  className="text-xs text-muted-foreground"
-                >
-                  Show Errors Only
-                </Label>
               </div>
-              </div>
-              
+
             </div>
 
             <div className="space-y-4 pt-4">
@@ -789,10 +862,10 @@ export default function WebsiteLogs() {
                             log.health_status.toLowerCase() === "healthy"
                               ? "text-emerald-600"
                               : log.health_status.toLowerCase() === "degraded"
-                              ? "text-yellow-600"
-                              : log.health_status.toLowerCase() === "offline"
-                              ? "text-red-600"
-                              : "text-gray-600"
+                                ? "text-yellow-600"
+                                : log.health_status.toLowerCase() === "offline"
+                                  ? "text-red-600"
+                                  : "text-gray-600"
                           )}
                         >
                           {log.health_status}
